@@ -133,11 +133,9 @@ class MainActivity : ComponentActivity() {
             
             Spacer(modifier = Modifier.height(32.dp))
             
-            Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.Info,
-                contentDescription = "Permission Required",
-                modifier = Modifier.size(64.dp),
-                tint = Color.Yellow
+            Text(
+                text = "⚠️",
+                style = MaterialTheme.typography.displayLarge
             )
             
             Spacer(modifier = Modifier.height(24.dp))
