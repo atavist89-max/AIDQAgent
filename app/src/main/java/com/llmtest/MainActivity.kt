@@ -250,6 +250,8 @@ class MainActivity : ComponentActivity() {
         val s2 by pm.stage2Output.collectAsState()
         val s3 by pm.stage3Output.collectAsState()
         val s4 by pm.stage4Output.collectAsState()
+        val upstream by pm.upstreamReport.collectAsState()
+        val downstream by pm.downstreamReport.collectAsState()
 
         Column(
             modifier = Modifier
@@ -259,7 +261,7 @@ class MainActivity : ComponentActivity() {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                "DQ Agent - Stage ${if (stage == 5) "4/4" else "$stage/4"}",
+                "DQ Agent - Stage ${if (stage >= 41) "4/4" else if (stage >= 1) "$stage/4" else "0/4"}",
                 style = MaterialTheme.typography.headlineSmall
             )
 
@@ -284,14 +286,58 @@ class MainActivity : ComponentActivity() {
                 isComplete = stage > 3
             )
 
-            StageBox(
-                title = "Stage 4: AI Synthesis",
-                content = s4,
-                isActive = stage == 4,
-                isComplete = stage == 5
-            )
+            if (stage >= 41) {
+                StageBox(
+                    title = "Stage 4a: Upstream Researcher",
+                    content = upstream.take(150) + if (upstream.length > 150) "..." else "",
+                    isActive = stage == 41,
+                    isComplete = stage > 41
+                )
+            }
 
-            Spacer(modifier = Modifier.weight(1f))
+            if (stage >= 42) {
+                StageBox(
+                    title = "Stage 4b: Downstream Researcher",
+                    content = downstream.take(150) + if (downstream.length > 150) "..." else "",
+                    isActive = stage == 42,
+                    isComplete = stage > 42
+                )
+            }
+
+            if (stage >= 43) {
+                StageBox(
+                    title = "Stage 4c: Synthesizer",
+                    content = "Executive Report: " + s4.take(100) + if (s4.length > 100) "..." else "",
+                    isActive = stage == 43,
+                    isComplete = stage == 5
+                )
+            }
+
+            if (stage == 5 && s4.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            "Executive Stewardship Report",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            s4,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

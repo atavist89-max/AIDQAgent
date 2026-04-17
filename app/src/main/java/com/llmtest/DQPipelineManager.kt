@@ -27,6 +27,13 @@ class DQPipelineManager(private val engine: Engine) {
     private val _stage4Output = MutableStateFlow("")
     val stage4Output: StateFlow<String> = _stage4Output
     
+    // Sub-stage reports for multi-agent Stage 4
+    private val _upstreamReport = MutableStateFlow("")
+    val upstreamReport: StateFlow<String> = _upstreamReport
+    
+    private val _downstreamReport = MutableStateFlow("")
+    val downstreamReport: StateFlow<String> = _downstreamReport
+    
     fun startAnalysis(alert: DQAlert) {
         scope.launch {
             _currentStage.value = 1
@@ -35,6 +42,8 @@ class DQPipelineManager(private val engine: Engine) {
             _stage2Output.value = ""
             _stage3Output.value = ""
             _stage4Output.value = ""
+            _upstreamReport.value = ""
+            _downstreamReport.value = ""
             
             // Stage 1: Triage
             val stage1 = Stage1Triage.run(alert)
@@ -66,14 +75,28 @@ class DQPipelineManager(private val engine: Engine) {
             val health = stage3.healthScore?.let { "${(it * 100).toInt()}%" } ?: "N/A"
             _stage3Output.value = "Pattern: $pattern | Owner load: $ownerLoad | Group health: $health"
             
-            // Stage 4: Synthesis (with cooldown)
-            _currentStage.value = 4
+            // Stage 4a: Upstream Researcher (Technical Deep Dive)
+            _currentStage.value = 41
             delay(10000)
-            val stage4 = Stage4Synthesis.run(alert, stage3, engine)
+            val stage4a = Stage4UpstreamResearcher.run(alert, stage3, engine)
+            _upstreamReport.value = stage4a.upstreamReport
+            _stage4Output.value = "Upstream: Technical analysis complete (${stage4a.upstreamReport.length} chars)"
+            
+            // Stage 4b: Downstream Researcher (Impact Deep Dive)
+            _currentStage.value = 42
+            delay(10000)
+            val stage4b = Stage4DownstreamResearcher.run(alert, stage3, engine)
+            _downstreamReport.value = stage4b.downstreamReport
+            _stage4Output.value = "Downstream: Impact assessment complete (${stage4b.downstreamReport.length} chars)"
+            
+            // Stage 4c: Synthesizer (Executive Narrative)
+            _currentStage.value = 43
+            delay(10000)
+            val stage4c = Stage4Synthesizer.run(alert, stage4a, stage4b, stage3, engine)
             
             // Complete
             _currentStage.value = 5
-            val report = stage4.finalReport ?: "Analysis complete - no report generated"
+            val report = stage4c.finalReport ?: "Analysis complete - no report generated"
             _stage4Output.value = report
             _finalReport.value = report
         }
