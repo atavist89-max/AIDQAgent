@@ -98,7 +98,7 @@ object Stage4Synthesis {
         val response = try {
             val conversation = engine.createConversation(
                 ConversationConfig(
-                    samplerConfig = SamplerConfig(temperature = 0.2f, topK = 40, topP = 0.9)
+                    samplerConfig = SamplerConfig(temperature = 0.2, topK = 40, topP = 0.9)
                 )
             )
             
