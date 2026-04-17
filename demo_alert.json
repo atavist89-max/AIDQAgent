@@ -1,0 +1,11 @@
+{
+  "lastCheckRunTime": "2026-04-17T14:30:00",
+  "evaluationStatus": "fail",
+  "checkName": "Unexpected value distribution shift",
+  "datasetName": "LINK_ORDER_CUSTOMER",
+  "datasourceName": "beta_hub",
+  "datasourceType": "postgres",
+  "ownerEmail": "avery.brown@example.com",
+  "severity": "Critical",
+  "dimension": "Adaptability"
+}
