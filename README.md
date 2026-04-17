@@ -94,6 +94,46 @@ Token limit (~2,000) requires chunking. Each stage fits within budget while accu
 
 ---
 
+## Project Structure
+
+```
+├── .github/workflows/build.yml     # CI: builds debug APK on every push/PR
+├── app/build.gradle                # App-level build config (SDK 36, Compose, LiteRT-LM)
+├── app/src/main/AndroidManifest.xml# App manifest: MANAGE_EXTERNAL_STORAGE + native libs
+├── app/src/main/java/com/llmtest/
+│   ├── MainActivity.kt             # Entry point: UI (Jetpack Compose), engine init, file polling
+│   ├── GhostPaths.kt               # Centralized hard-coded paths to model, data, state, input
+│   ├── DQDataClasses.kt            # @Serializable data models: Alert, Entity, Report, Catalog, AnalysisState
+│   ├── DQPipelineManager.kt        # Orchestrates Stage 1→4 with 10s thermal cooldowns between each
+│   ├── Stage1Triage.kt             # Severity + downstream report impact → FULL_ANALYSIS or MINIMAL
+│   ├── Stage2ContextBuilder.kt     # Entity lookup, column defs, source system → condensed context string
+│   ├── Stage3PatternDetector.kt    # Owner workload correlation, group health → pattern detection
+│   ├── Stage4Synthesis.kt          # Builds prompt, calls Gemma via LiteRT-LM → 4-line executive report
+│   ├── EntityData.kt               # Legacy entity info data class (pre-DQ pipeline)
+│   └── BugLogger.kt                # File-based timestamped logger (logs/bug_log.txt)
+├── build.gradle                    # Root project plugins (Android, Kotlin, Compose, Serialization)
+├── settings.gradle                 # Project name + repository config (Google, Maven Central)
+├── gradle.properties               # AndroidX, compile SDK override, JVM heap settings
+├── demo_alert.json                 # Golden demo alert (LINK_ORDER_CUSTOMER, Critical, Adaptability)
+└── README.md                       # This file
+```
+
+### What Each Component Does
+
+| File | Responsibility |
+|------|----------------|
+| `MainActivity.kt` | Jetpack Compose UI with stage indicator, progress bar, and report card. Initializes the LiteRT-LM engine and starts a 5-second file poll loop on `demo_input/new_alert.json`. |
+| `GhostPaths.kt` | Single source of truth for all absolute file paths on device. Validates model availability (`>1GB`) and DQ data directory presence. |
+| `DQDataClasses.kt` | Kotlinx Serialization data classes consumed by all stages. `AnalysisState` is the accumulator passed from Stage 1→4. |
+| `DQPipelineManager.kt` | CoroutineScope-driven orchestrator. Handles stage progression, 10s `delay()` cooldowns, and early-exit for `MINIMAL` alerts. |
+| `Stage1Triage.kt` | Loads `reports.json`, checks if the alert dataset feeds any executive (`Class 2`) reports. Decides `FULL_ANALYSIS` vs `MINIMAL`. Writes `stage1.json`. |
+| `Stage2ContextBuilder.kt` | Loads `entities.json`, `catalog_columns.json`, `entity_groups.json`. Builds a condensed business context string (<1,200 tokens). Writes `stage2.json`. |
+| `Stage3PatternDetector.kt` | Loads `dq_alerts.json` to count owner failures and compute entity group health score. Detects `owner_overload`, `group_collapse`, or `isolated_incident`. Writes `stage3.json`. |
+| `Stage4Synthesis.kt` | Loads `dq_knowledge.json` for severity rules and dimension definitions. Constructs a constrained prompt (~1,800 tokens) and calls Gemma. Writes `stage4.json`. Falls back to a templated report if LLM fails. |
+| `BugLogger.kt` | Thread-safe file logger. Logs every stage transition, file I/O error, and LLM exception to app-private storage. Accessible via "Logs" button in UI. |
+
+---
+
 ## Data Model Integration
 
 The system consumes 5 integrated data sources:
