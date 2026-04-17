@@ -1,8 +1,5 @@
 package com.llmtest
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -35,85 +32,94 @@ import kotlinx.serialization.json.Json
 
 class MainActivity : ComponentActivity() {
     private var engine: Engine? = null
-    private lateinit var pipelineManager: DQPipelineManager
+    private var pipelineManager: DQPipelineManager? = null
 
-    // State for UI
+    // UI State
+    private val hasPermission = mutableStateOf(false)
+    private val isInitialized = mutableStateOf(false)
     private val currentStage = mutableStateOf(0)
     private val finalReport = mutableStateOf("")
-    private val statusMessage = mutableStateOf("Waiting for DQ alerts...")
-    private val hasPermission = mutableStateOf(false)
+    private val statusMessage = mutableStateOf("Initializing...")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         BugLogger.initialize(this)
         
-        // Check initial permission state
+        // Check permission immediately (same as Gemma template)
         hasPermission.value = hasStoragePermission()
         BugLogger.log("onCreate: hasPermission = ${hasPermission.value}")
+
+        // If already permitted, initialize now (synchronous, before UI)
+        if (hasPermission.value) {
+            initializeApp()
+        }
 
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    if (!hasPermission.value) {
-                        PermissionRequestScreen()
-                    } else {
-                        // Permission granted - initialize and show main UI
-                        LaunchedEffect(Unit) {
-                            initializeApp()
-                        }
-                        DQAgentScreen()
+                    when {
+                        !hasPermission.value -> PermissionRequestScreen()
+                        !isInitialized.value -> LoadingScreen()
+                        else -> DQAgentScreen()
                     }
                 }
             }
         }
         
-        // Setup lifecycle observer to detect when user returns from permission settings
+        // Lifecycle observer (same pattern as Gemma template)
         setupPermissionObserver()
     }
     
     private fun setupPermissionObserver() {
-        val observer = LifecycleEventObserver { _, event ->
+        lifecycle.addObserver(LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                val newPermission = hasStoragePermission()
-                BugLogger.log("ON_RESUME: permission changed to $newPermission")
-                if (newPermission != hasPermission.value) {
-                    hasPermission.value = newPermission
-                    if (newPermission) {
-                        // User just granted permission - initialize app
-                        lifecycleScope.launch {
-                            initializeApp()
-                        }
-                    }
+                val nowHasPermission = hasStoragePermission()
+                BugLogger.log("ON_RESUME: permission = $nowHasPermission")
+                
+                if (nowHasPermission && !hasPermission.value) {
+                    // User just granted permission
+                    hasPermission.value = true
+                    initializeApp()
                 }
             }
-        }
-        lifecycle.addObserver(observer)
+        })
     }
     
-    private suspend fun initializeApp() {
-        withContext(Dispatchers.IO) {
-            try {
-                // Check if data files exist
-                if (!GhostPaths.isDQDataAvailable()) {
-                    BugLogger.log("WARNING: DQ data not available at ${GhostPaths.DQ_DATA_DIR}")
-                }
-                if (!GhostPaths.isModelAvailable()) {
-                    BugLogger.log("WARNING: Model not available at ${GhostPaths.MODEL_FILE}")
-                }
-                
-                // Initialize engine
-                initEngine()
-                pipelineManager = DQPipelineManager(engine!!)
-                
-                // Start file polling
-                startFilePolling()
-                
-                withContext(Dispatchers.Main) {
-                    statusMessage.value = "Ready. Waiting for alerts..."
-                }
-            } catch (e: Exception) {
-                BugLogger.logError("Failed to initialize app", e)
+    private fun initializeApp() {
+        // Prevent double initialization
+        if (isInitialized.value) return
+        
+        BugLogger.log("Initializing app...")
+        
+        try {
+            // Check data availability
+            if (!GhostPaths.isDQDataAvailable()) {
+                BugLogger.log("WARNING: DQ data not available")
+                statusMessage.value = "Warning: DQ data missing"
             }
+            if (!GhostPaths.isModelAvailable()) {
+                BugLogger.log("WARNING: Model not available")
+                statusMessage.value = "Warning: AI model missing"
+            }
+            
+            // Initialize engine (synchronous, same as Gemma template)
+            initEngine()
+            
+            // Create pipeline manager
+            val engineInstance = engine ?: throw IllegalStateException("Engine failed to initialize")
+            pipelineManager = DQPipelineManager(engineInstance)
+            
+            // Start polling
+            startFilePolling()
+            
+            // Mark ready
+            isInitialized.value = true
+            statusMessage.value = "Ready. Waiting for alerts..."
+            BugLogger.log("App initialized successfully")
+            
+        } catch (e: Exception) {
+            BugLogger.logError("Failed to initialize app", e)
+            statusMessage.value = "Error: ${e.message}"
         }
     }
 
@@ -126,51 +132,49 @@ class MainActivity : ComponentActivity() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                "DQ Agent",
-                style = MaterialTheme.typography.headlineLarge
-            )
-            
+            Text("DQ Agent", style = MaterialTheme.typography.headlineLarge)
             Spacer(modifier = Modifier.height(32.dp))
-            
-            Text(
-                text = "⚠️",
-                style = MaterialTheme.typography.displayLarge
-            )
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
             Text(
                 "Permission Required",
                 style = MaterialTheme.typography.titleLarge
             )
-            
             Spacer(modifier = Modifier.height(16.dp))
-            
             Text(
                 "This app needs 'All Files Access' permission to read:\n" +
-                "• The AI model (gemma-4-e2b.litertlm)\n" +
+                "• AI model (gemma-4-e2b.litertlm)\n" +
                 "• DQ data files from GhostModels/DQAgent/",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
-            
             Spacer(modifier = Modifier.height(32.dp))
-            
             Button(
                 onClick = { requestStoragePermission() },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Grant Permission")
             }
-            
             Spacer(modifier = Modifier.height(16.dp))
-            
             Text(
-                "After granting, return to this app",
+                "Tap button → Toggle permission → Return to app",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+
+    @Composable
+    fun LoadingScreen() {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                CircularProgressIndicator()
+                Text(statusMessage.value)
+            }
         }
     }
 
@@ -191,9 +195,8 @@ class MainActivity : ComponentActivity() {
                 startActivity(intent)
                 BugLogger.log("Opened permission settings")
             } catch (e: Exception) {
-                BugLogger.logError("Failed to open permission settings", e)
-                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                startActivity(intent)
+                BugLogger.logError("Failed to open settings", e)
+                Toast.makeText(this, "Please enable permission manually", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -216,7 +219,7 @@ class MainActivity : ComponentActivity() {
             BugLogger.log("Starting file polling...")
             while (isActive) {
                 checkForNewAlerts()
-                delay(5000) // Check every 5 seconds
+                delay(5000)
             }
         }
     }
@@ -228,13 +231,11 @@ class MainActivity : ComponentActivity() {
         try {
             val json = Json { ignoreUnknownKeys = true }
             val alert = json.decodeFromString(DQAlert.serializer(), inputFile.readText())
-
-            // Move file to prevent reprocessing
             inputFile.delete()
 
             withContext(Dispatchers.Main) {
                 statusMessage.value = "Processing ${alert.datasetName}..."
-                pipelineManager.startAnalysis(alert)
+                pipelineManager?.startAnalysis(alert)
             }
         } catch (e: Exception) {
             BugLogger.logError("Failed to process input file", e)
@@ -243,8 +244,10 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun DQAgentScreen() {
-        val stage by pipelineManager.currentStage.collectAsState()
-        val report by pipelineManager.finalReport.collectAsState()
+        val pm = pipelineManager ?: return // Safety: shouldn't happen if isInitialized is true
+        
+        val stage by pm.currentStage.collectAsState()
+        val report by pm.finalReport.collectAsState()
 
         Column(
             modifier = Modifier
@@ -253,12 +256,8 @@ class MainActivity : ComponentActivity() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                "DQ Agent",
-                style = MaterialTheme.typography.headlineMedium
-            )
+            Text("DQ Agent", style = MaterialTheme.typography.headlineMedium)
 
-            // Status indicator
             Box(
                 modifier = Modifier
                     .size(20.dp)
@@ -273,7 +272,6 @@ class MainActivity : ComponentActivity() {
                     )
             )
 
-            // Stage indicator
             Text(
                 when (stage) {
                     0 -> statusMessage.value
@@ -287,7 +285,6 @@ class MainActivity : ComponentActivity() {
                 style = MaterialTheme.typography.bodyLarge
             )
 
-            // Progress bar
             if (stage in 1..4) {
                 LinearProgressIndicator(
                     progress = { stage / 4f },
@@ -295,7 +292,6 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            // Final report card
             if (stage == 5 && report.isNotEmpty()) {
                 Card(
                     modifier = Modifier
@@ -307,10 +303,7 @@ class MainActivity : ComponentActivity() {
                             .padding(16.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
-                        Text(
-                            "Analysis Report",
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        Text("Analysis Report", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             report,
@@ -323,17 +316,15 @@ class MainActivity : ComponentActivity() {
                 Spacer(modifier = Modifier.weight(1f))
             }
 
-            // Debug buttons
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Button(onClick = { /* manual trigger for testing */ }) {
+                Button(onClick = { /* manual trigger */ }) {
                     Text("Test")
                 }
-                Button(onClick = { 
-                    val logs = BugLogger.readLog()
-                    Toast.makeText(this@MainActivity, logs.take(200), Toast.LENGTH_LONG).show()
+                Button(onClick = {
+                    Toast.makeText(this@MainActivity, BugLogger.readLog().take(300), Toast.LENGTH_LONG).show()
                 }) {
                     Text("Logs")
                 }
@@ -343,9 +334,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (::pipelineManager.isInitialized) {
-            pipelineManager.cancel()
-        }
+        pipelineManager?.cancel()
         engine?.close()
     }
 }
