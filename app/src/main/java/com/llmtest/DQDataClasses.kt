@@ -71,5 +71,8 @@ data class AnalysisState(
     val decision: String? = null,
     val contextSummary: String? = null,
     val patternResult: String? = null,
-    val finalReport: String? = null
+    val finalReport: String? = null,
+    val ownerLoad: Int? = null,
+    val healthScore: Float? = null,
+    val patternType: String? = null
 )
