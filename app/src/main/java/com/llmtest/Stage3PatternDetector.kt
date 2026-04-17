@@ -18,7 +18,7 @@ object Stage3PatternDetector {
         
         // Load entities for group health calculation
         val entities = loadEntities()
-        val groupEntities = entities.filter { it.entityGroup == alert.datasourceName } // Or match by entity group
+        val groupEntities = entities.filter { it.entityGroup == alert.datasourceName }
         
         val groupAlerts = allAlerts.filter { alert ->
             entities.any { it.linkedDatasetName == alert.datasetName && it.entityGroup == alert.datasourceName }
@@ -29,6 +29,12 @@ object Stage3PatternDetector {
         val healthScore = if (groupTotal > 0) groupPassing.toFloat() / groupTotal else 1.0f
         
         // Pattern detection
+        val patternType = when {
+            ownerFailures.size > 2 -> "owner_overload"
+            healthScore < 0.6f -> "group_collapse"
+            else -> "isolated_incident"
+        }
+        
         val pattern = when {
             ownerFailures.size > 2 -> "owner_overload: ${ownerFailures.size} Critical/Error failures"
             healthScore < 0.6f -> "group_collapse: ${(healthScore * 100).toInt()}% health"
@@ -43,7 +49,10 @@ object Stage3PatternDetector {
         
         val state = stage2State.copy(
             stage = 3,
-            patternResult = patternResult
+            patternResult = patternResult,
+            ownerLoad = ownerFailures.size,
+            healthScore = healthScore,
+            patternType = patternType
         )
         
         GhostPaths.stateFile(3).writeText(json.encodeToString(AnalysisState.serializer(), state))

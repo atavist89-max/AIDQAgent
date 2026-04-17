@@ -12,14 +12,13 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -244,77 +243,55 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun DQAgentScreen() {
-        val pm = pipelineManager ?: return // Safety: shouldn't happen if isInitialized is true
+        val pm = pipelineManager ?: return
         
         val stage by pm.currentStage.collectAsState()
-        val report by pm.finalReport.collectAsState()
+        val s1 by pm.stage1Output.collectAsState()
+        val s2 by pm.stage2Output.collectAsState()
+        val s3 by pm.stage3Output.collectAsState()
+        val s4 by pm.stage4Output.collectAsState()
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(8.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("DQ Agent", style = MaterialTheme.typography.headlineMedium)
-
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .background(
-                        color = when (stage) {
-                            0 -> Color.Gray
-                            1, 2, 3, 4 -> Color.Yellow
-                            5 -> if (report.contains("Error")) Color.Red else Color.Green
-                            else -> Color.Gray
-                        },
-                        shape = CircleShape
-                    )
-            )
-
             Text(
-                when (stage) {
-                    0 -> statusMessage.value
-                    1 -> "Stage 1: Triage Analysis..."
-                    2 -> "Stage 2: Building Context..."
-                    3 -> "Stage 3: Pattern Detection..."
-                    4 -> "Stage 4: AI Synthesis..."
-                    5 -> "Analysis Complete"
-                    else -> "Unknown"
-                },
-                style = MaterialTheme.typography.bodyLarge
+                "DQ Agent - Stage ${if (stage == 5) "4/4" else "$stage/4"}",
+                style = MaterialTheme.typography.headlineSmall
             )
 
-            if (stage in 1..4) {
-                LinearProgressIndicator(
-                    progress = { stage / 4f },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            StageBox(
+                title = "Stage 1: Triage",
+                content = s1,
+                isActive = stage == 1,
+                isComplete = stage > 1
+            )
 
-            if (stage == 5 && report.isNotEmpty()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        Text("Analysis Report", style = MaterialTheme.typography.titleMedium)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            report,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    }
-                }
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
-            }
+            StageBox(
+                title = "Stage 2: Context Builder",
+                content = s2,
+                isActive = stage == 2,
+                isComplete = stage > 2
+            )
+
+            StageBox(
+                title = "Stage 3: Pattern Detection",
+                content = s3,
+                isActive = stage == 3,
+                isComplete = stage > 3
+            )
+
+            StageBox(
+                title = "Stage 4: AI Synthesis",
+                content = s4,
+                isActive = stage == 4,
+                isComplete = stage == 5
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -327,6 +304,44 @@ class MainActivity : ComponentActivity() {
                     Toast.makeText(this@MainActivity, BugLogger.readLog().take(300), Toast.LENGTH_LONG).show()
                 }) {
                     Text("Logs")
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun StageBox(title: String, content: String, isActive: Boolean, isComplete: Boolean) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = when {
+                    isActive -> Color(0xFFFFF9C4)
+                    isComplete -> Color(0xFFE8F5E9)
+                    else -> Color(0xFFF5F5F5)
+                }
+            )
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = when {
+                        isActive -> Color(0xFFF57C00)
+                        isComplete -> Color(0xFF2E7D32)
+                        else -> Color.Gray
+                    }
+                )
+                if (content.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        content,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = if (isComplete && title.contains("Synthesis")) Int.MAX_VALUE else 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else if (isActive) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
                 }
             }
         }
