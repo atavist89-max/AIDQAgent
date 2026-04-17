@@ -1,64 +1,66 @@
 package com.llmtest
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class DQAlert(
-    val lastCheckRunTime: String,
-    val evaluationStatus: String,
-    val checkName: String,
-    val datasetName: String,
-    val datasourceName: String,
-    val datasourceType: String? = null,
-    val ownerEmail: String,
-    val severity: String,
-    val dimension: String,
+    @SerialName("LAST_CHECK_RUN_TIME") val lastCheckRunTime: String,
+    @SerialName("EVALUATION_STATUS") val evaluationStatus: String,
+    @SerialName("CHECK_NAME") val checkName: String,
+    @SerialName("DATASET_NAME") val datasetName: String,
+    @SerialName("DATASOURCE_NAME") val datasourceName: String,
+    @SerialName("DATASOURCE_TYPE") val datasourceType: String? = null,
+    @SerialName("OWNER_EMAIL") val ownerEmail: String,
+    @SerialName("DQ_CHECK_SEVERITY") val severity: String,
+    @SerialName("DQ_DIMENSION") val dimension: String,
     var analysisState: String = "NEW"
 )
 
 @Serializable
 data class Entity(
-    val entityId: String? = null,
-    val entityName: String,
-    val entityGroup: String,
-    val ownerEmail: String,
-    val description: String,
-    val linkedDatasetName: String,
-    val tags: String? = null,
-    val usageNotes: String? = null
+    @SerialName("ENTITY_ID") val entityId: String? = null,
+    @SerialName("ENTITY_NAME") val entityName: String,
+    @SerialName("ENTITY_GROUP") val entityGroup: String,
+    @SerialName("OWNER_EMAIL") val ownerEmail: String,
+    @SerialName("DESCRIPTION") val description: String,
+    @SerialName("LINKED_DATASET_NAME") val linkedDatasetName: String,
+    @SerialName("TAGS") val tags: String? = null,
+    @SerialName("USAGE_NOTES") val usageNotes: String? = null
 )
 
 @Serializable
 data class EntityGroup(
-    val entityGroupId: String? = null,
-    val entityGroup: String,
-    val ownerEmail: String,
-    val description: String,
-    val tags: String? = null
+    @SerialName("ENTITY_GROUP_ID") val entityGroupId: String? = null,
+    @SerialName("ENTITY_GROUP") val entityGroup: String,
+    @SerialName("OWNER_EMAIL") val ownerEmail: String,
+    @SerialName("DESCRIPTION") val description: String,
+    @SerialName("TAGS") val tags: String? = null
 )
 
 @Serializable
 data class CatalogColumn(
-    val entityName: String,
-    val linkedDatasetName: String,
-    val id: String,
-    val name: String,
-    val businessObject: String,
-    val definition: String,
-    val dataExample: String? = null,
-    val sourceDB: String? = null,
-    val sourceTable: String? = null,
-    val sourceAttribute: String? = null,
-    val relevantObjects: String? = null
+    @SerialName("ENTITY_NAME") val entityName: String,
+    @SerialName("LINKED_DATASET_NAME") val linkedDatasetName: String,
+    @SerialName("id") val id: String,
+    @SerialName("name") val name: String,
+    @SerialName("businessObject") val businessObject: String,
+    @SerialName("definition") val definition: String,
+    @SerialName("dataExample") val dataExample: String? = null,
+    @SerialName("sourceDB") val sourceDB: String? = null,
+    @SerialName("sourceTable") val sourceTable: String? = null,
+    @SerialName("sourceAttribute") val sourceAttribute: String? = null,
+    @SerialName("sourceDescription") val sourceDescription: String? = null,
+    @SerialName("relevantObjects") val relevantObjects: String? = null
 )
 
 @Serializable
 data class Report(
-    val reportName: String,
-    val reportDescription: String,
-    val reportOwner: String,
-    val dataSources: String,
-    val reportClass: String
+    @SerialName("Report Name") val reportName: String,
+    @SerialName("Report Description") val reportDescription: String,
+    @SerialName("Report Owner") val reportOwner: String,
+    @SerialName("Data sources") val dataSources: String,
+    @SerialName("Report Class") val reportClass: String
 )
 
 @Serializable
@@ -69,8 +71,5 @@ data class AnalysisState(
     val decision: String? = null,
     val contextSummary: String? = null,
     val patternResult: String? = null,
-    val finalReport: String? = null,
-    val ownerLoad: Int? = null,
-    val healthScore: Float? = null,
-    val patternType: String? = null
+    val finalReport: String? = null
 )

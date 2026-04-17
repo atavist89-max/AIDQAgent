@@ -182,28 +182,28 @@ object Stage4Synthesis {
 
 @kotlinx.serialization.Serializable
 data class DQKnowledge(
-    val severityRules: Map<String, SeverityRule>,
-    val dimensions: Map<String, DimensionDef>,
-    val kpiThresholds: KPIThresholds
+    @SerialName("severity_rules") val severityRules: Map<String, SeverityRule>,
+    @SerialName("dimensions") val dimensions: Map<String, DimensionDef>,
+    @SerialName("kpi_thresholds") val kpiThresholds: KPIThresholds
 )
 
 @kotlinx.serialization.Serializable
 data class SeverityRule(
-    val kpiTargetDays: Int?,
-    val businessCriticality: String,
-    val description: String
+    @SerialName("kpi_target_days") val kpiTargetDays: Int?,
+    @SerialName("business_criticality") val businessCriticality: String,
+    @SerialName("description") val description: String
 )
 
 @kotlinx.serialization.Serializable
 data class DimensionDef(
-    val definition: String,
-    val riskType: String
+    @SerialName("definition") val definition: String,
+    @SerialName("risk_type") val riskType: String
 )
 
 @kotlinx.serialization.Serializable
 data class KPIThresholds(
-    val healthScoreGood: Float,
-    val healthScoreCaution: Float,
-    val healthScoreDescriptions: Map<String, String>,
-    val aggregationLevels: List<String>
+    @SerialName("health_score_good") val healthScoreGood: Float,
+    @SerialName("health_score_caution") val healthScoreCaution: Float,
+    @SerialName("health_score_descriptions") val healthScoreDescriptions: Map<String, String>,
+    @SerialName("aggregation_levels") val aggregationLevels: List<String>
 )
