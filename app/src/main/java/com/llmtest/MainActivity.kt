@@ -296,7 +296,7 @@ class MainActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val headerText = when {
-                    stage == 5 -> "DQ Agent - Data Quality Report Complete"
+                    stage == 50 -> "DQ Agent - Data Quality Report Complete"
                     stage >= 41 -> "DQ Agent - Stage 4/4"
                     stage >= 1 -> "DQ Agent - Stage $stage/4"
                     else -> "DQ Agent - Stage 0/4"
@@ -353,11 +353,11 @@ class MainActivity : ComponentActivity() {
                         content = "Executive Report: " + s4.take(100) + if (s4.length > 100) "..." else "",
                         fullContent = "Executive Report: " + s4,
                         isActive = stage == 43,
-                        isComplete = stage == 5
+                        isComplete = stage == 50
                     )
                 }
 
-                if (stage == 5 && s4.isNotEmpty()) {
+                if (stage == 50 && s4.isNotEmpty()) {
                     Card(
                         modifier = Modifier.fillMaxWidth()
                     ) {

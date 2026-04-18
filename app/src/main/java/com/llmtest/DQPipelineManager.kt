@@ -54,7 +54,7 @@ class DQPipelineManager(private val engine: Engine) {
                 val minimal = generateMinimalReport(alert)
                 _stage4Output.value = minimal
                 _finalReport.value = minimal
-                _currentStage.value = 5
+                _currentStage.value = 50
                 return@launch
             }
             
@@ -95,7 +95,7 @@ class DQPipelineManager(private val engine: Engine) {
             val stage4c = Stage4Synthesizer.run(alert, stage4a, stage4b, stage3, engine)
             
             // Complete
-            _currentStage.value = 5
+            _currentStage.value = 50
             val report = stage4c.finalReport ?: "Analysis complete - no report generated"
             _stage4Output.value = report
             _finalReport.value = report
