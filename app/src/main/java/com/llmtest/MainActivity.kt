@@ -295,8 +295,14 @@ class MainActivity : ComponentActivity() {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                val headerText = when {
+                    stage == 5 -> "DQ Agent - Data Quality Report Complete"
+                    stage >= 41 -> "DQ Agent - Stage 4/4"
+                    stage >= 1 -> "DQ Agent - Stage $stage/4"
+                    else -> "DQ Agent - Stage 0/4"
+                }
                 Text(
-                    "DQ Agent - Stage ${if (stage >= 41) "4/4" else if (stage >= 1) "$stage/4" else "0/4"}",
+                    headerText,
                     style = MaterialTheme.typography.headlineSmall
                 )
 
