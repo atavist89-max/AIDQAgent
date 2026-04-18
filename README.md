@@ -215,12 +215,14 @@ App requires `MANAGE_EXTERNAL_STORAGE` (Android 11+) to read:
 
 - **Locked portrait orientation** — prevents accidental screen rotation from resetting pipeline state/presets during analysis.
 - **Expandable stage outputs** — Stage 4a, 4b, and 4c cards show truncated previews by default to save vertical space. Tap **Expand** to view the full report inline; tap **Collapse** to return to the preview.
+- **Persistent stage visibility** — after the pipeline completes, all stage outputs remain visible in the scrollable feed (the final report no longer pushes earlier stages out of view).
+- **Completion header** — when the final report is ready, the top header changes from stage counters to **"Data Quality Report Complete"**.
 
 ## Project Status
 
 **Current:** MVP complete — 4-stage pipeline functional, demo-ready
 
-**Recent:** Portrait lock + expandable truncated outputs
+**Recent:** Portrait lock + expandable truncated outputs + persistent stage visibility + completion header
 
 **Next:** Integration with live DQ feed (replace file drop with real-time API)
 
