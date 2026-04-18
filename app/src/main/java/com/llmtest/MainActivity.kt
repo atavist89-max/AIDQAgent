@@ -286,97 +286,97 @@ class MainActivity : ComponentActivity() {
         val downstream by pm.downstreamReport.collectAsState()
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
-            Text(
-                "DQ Agent - Stage ${if (stage >= 41) "4/4" else if (stage >= 1) "$stage/4" else "0/4"}",
-                style = MaterialTheme.typography.headlineSmall
-            )
-
-            StageBox(
-                title = "Stage 1: Triage",
-                content = s1,
-                isActive = stage == 1,
-                isComplete = stage > 1
-            )
-
-            StageBox(
-                title = "Stage 2: Context Builder",
-                content = s2,
-                isActive = stage == 2,
-                isComplete = stage > 2
-            )
-
-            StageBox(
-                title = "Stage 3: Pattern Detection",
-                content = s3,
-                isActive = stage == 3,
-                isComplete = stage > 3
-            )
-
-            if (stage >= 41) {
-                StageBox(
-                    title = "Stage 4a: Upstream Researcher",
-                    content = upstream.take(150) + if (upstream.length > 150) "..." else "",
-                    fullContent = upstream,
-                    isActive = stage == 41,
-                    isComplete = stage > 41
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(8.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "DQ Agent - Stage ${if (stage >= 41) "4/4" else if (stage >= 1) "$stage/4" else "0/4"}",
+                    style = MaterialTheme.typography.headlineSmall
                 )
-            }
 
-            if (stage >= 42) {
                 StageBox(
-                    title = "Stage 4b: Downstream Researcher",
-                    content = downstream.take(150) + if (downstream.length > 150) "..." else "",
-                    fullContent = downstream,
-                    isActive = stage == 42,
-                    isComplete = stage > 42
+                    title = "Stage 1: Triage",
+                    content = s1,
+                    isActive = stage == 1,
+                    isComplete = stage > 1
                 )
-            }
 
-            if (stage >= 43) {
                 StageBox(
-                    title = "Stage 4c: Synthesizer",
-                    content = "Executive Report: " + s4.take(100) + if (s4.length > 100) "..." else "",
-                    fullContent = "Executive Report: " + s4,
-                    isActive = stage == 43,
-                    isComplete = stage == 5
+                    title = "Stage 2: Context Builder",
+                    content = s2,
+                    isActive = stage == 2,
+                    isComplete = stage > 2
                 )
-            }
 
-            if (stage == 5 && s4.isNotEmpty()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .padding(12.dp)
-                            .verticalScroll(rememberScrollState())
+                StageBox(
+                    title = "Stage 3: Pattern Detection",
+                    content = s3,
+                    isActive = stage == 3,
+                    isComplete = stage > 3
+                )
+
+                if (stage >= 41) {
+                    StageBox(
+                        title = "Stage 4a: Upstream Researcher",
+                        content = upstream.take(150) + if (upstream.length > 150) "..." else "",
+                        fullContent = upstream,
+                        isActive = stage == 41,
+                        isComplete = stage > 41
+                    )
+                }
+
+                if (stage >= 42) {
+                    StageBox(
+                        title = "Stage 4b: Downstream Researcher",
+                        content = downstream.take(150) + if (downstream.length > 150) "..." else "",
+                        fullContent = downstream,
+                        isActive = stage == 42,
+                        isComplete = stage > 42
+                    )
+                }
+
+                if (stage >= 43) {
+                    StageBox(
+                        title = "Stage 4c: Synthesizer",
+                        content = "Executive Report: " + s4.take(100) + if (s4.length > 100) "..." else "",
+                        fullContent = "Executive Report: " + s4,
+                        isActive = stage == 43,
+                        isComplete = stage == 5
+                    )
+                }
+
+                if (stage == 5 && s4.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            "Executive Stewardship Report",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            s4,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Text(
+                                "Executive Stewardship Report",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                s4,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
                     }
                 }
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
             }
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
             ) {
                 Button(onClick = { /* manual trigger */ }) {
                     Text("Test")
