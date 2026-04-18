@@ -18,12 +18,21 @@ object Stage3PatternDetector {
         
         // Load entities for group health calculation
         val entities = loadEntities()
-        val groupEntities = entities.filter { it.entityGroup == alert.datasourceName }
         
-        val groupAlerts = allAlerts.filter { alert ->
-            entities.any { it.linkedDatasetName == alert.datasetName && it.entityGroup == alert.datasourceName }
-        }
+        // Find current alert's entity and its functional group
+        val currentEntity = entities.find { it.linkedDatasetName == alert.datasetName }
+        val currentGroup = currentEntity?.entityGroup
         
+        // Find all datasets in the same functional group
+        val groupDatasets = entities
+            .filter { it.entityGroup == currentGroup }
+            .map { it.linkedDatasetName }
+            .toSet()
+        
+        // Get all alerts for datasets in this group
+        val groupAlerts = allAlerts.filter { groupDatasets.contains(it.datasetName) }
+        
+        // Calculate health including current failing alert
         val groupPassing = groupAlerts.count { it.evaluationStatus == "pass" }
         val groupTotal = groupAlerts.size
         val healthScore = if (groupTotal > 0) groupPassing.toFloat() / groupTotal else 1.0f

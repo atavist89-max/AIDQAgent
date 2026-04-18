@@ -134,7 +134,7 @@ Token limit (~2,000) requires chunking. Each stage fits within budget while accu
 | `DQPipelineManager.kt` | CoroutineScope-driven orchestrator. Handles stage progression through 1→2→3→4a→4b→4c with 10s `delay()` cooldowns. Early-exit for `MINIMAL` alerts. |
 | `Stage1Triage.kt` | Loads `reports.json`, checks if the alert dataset feeds any executive (`Class 2`) reports. Decides `FULL_ANALYSIS` vs `MINIMAL`. Writes `stage1.json`. |
 | `Stage2ContextBuilder.kt` | Loads `entities.json`, `catalog_columns.json`, `entity_groups.json`. Builds a condensed business context string (<1,200 tokens). Writes `stage2.json`. |
-| `Stage3PatternDetector.kt` | Loads `dq_alerts.json` to count owner failures and compute entity group health score. Detects `owner_overload`, `group_collapse`, or `isolated_incident`. Writes `stage3.json`. |
+| `Stage3PatternDetector.kt` | Loads `dq_alerts.json` to count owner failures and compute entity group health score by functional group (not datasource). Detects `owner_overload`, `group_collapse`, or `isolated_incident`. Writes `stage3.json`. |
 | `Stage4UpstreamResearcher.kt` | Technical Data Architect sub-agent. Analyzes source system architecture, builds root cause hypothesis with confidence, and defines investigation path. Writes `stage4a.json`. |
 | `Stage4DownstreamResearcher.kt` | Business Impact Analyst sub-agent. Assesses cascade chains, stakeholder notification priority by report class, and time sensitivity. Writes `stage4b.json`. |
 | `Stage4Synthesizer.kt` | Senior Data Steward sub-agent. Synthesizes upstream + downstream research into a 350-400 word executive narrative for CDO briefing. Writes `stage4c.json`. |
