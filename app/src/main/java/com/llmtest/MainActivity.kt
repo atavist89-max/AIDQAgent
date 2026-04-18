@@ -322,6 +322,7 @@ class MainActivity : ComponentActivity() {
                 StageBox(
                     title = "Stage 4a: Upstream Researcher",
                     content = upstream.take(150) + if (upstream.length > 150) "..." else "",
+                    fullContent = upstream,
                     isActive = stage == 41,
                     isComplete = stage > 41
                 )
@@ -331,6 +332,7 @@ class MainActivity : ComponentActivity() {
                 StageBox(
                     title = "Stage 4b: Downstream Researcher",
                     content = downstream.take(150) + if (downstream.length > 150) "..." else "",
+                    fullContent = downstream,
                     isActive = stage == 42,
                     isComplete = stage > 42
                 )
@@ -340,6 +342,7 @@ class MainActivity : ComponentActivity() {
                 StageBox(
                     title = "Stage 4c: Synthesizer",
                     content = "Executive Report: " + s4.take(100) + if (s4.length > 100) "..." else "",
+                    fullContent = "Executive Report: " + s4,
                     isActive = stage == 43,
                     isComplete = stage == 5
                 )
@@ -388,7 +391,11 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun StageBox(title: String, content: String, isActive: Boolean, isComplete: Boolean) {
+    fun StageBox(title: String, content: String, isActive: Boolean, isComplete: Boolean, fullContent: String? = null) {
+        var expanded by rememberSaveable { mutableStateOf(false) }
+        val displayContent = if (expanded) fullContent ?: content else content
+        val canExpand = fullContent != null && fullContent != content
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -409,14 +416,27 @@ class MainActivity : ComponentActivity() {
                         else -> Color.Gray
                     }
                 )
-                if (content.isNotEmpty()) {
+                if (displayContent.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        content,
+                        displayContent,
                         style = MaterialTheme.typography.bodySmall,
-                        maxLines = if (isComplete && title.contains("Synthesis")) Int.MAX_VALUE else 4,
+                        maxLines = if (expanded || (isComplete && title.contains("Synthesis"))) Int.MAX_VALUE else 4,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (canExpand) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        TextButton(
+                            onClick = { expanded = !expanded },
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.height(24.dp)
+                        ) {
+                            Text(
+                                if (expanded) "Collapse" else "Expand",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
                 } else if (isActive) {
                     Spacer(modifier = Modifier.height(4.dp))
                     CircularProgressIndicator(modifier = Modifier.size(16.dp))

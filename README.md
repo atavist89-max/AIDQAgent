@@ -211,9 +211,16 @@ App requires `MANAGE_EXTERNAL_STORAGE` (Android 11+) to read:
 
 ---
 
+## UI & Interaction Notes
+
+- **Locked portrait orientation** — prevents accidental screen rotation from resetting pipeline state/presets during analysis.
+- **Expandable stage outputs** — Stage 4a, 4b, and 4c cards show truncated previews by default to save vertical space. Tap **Expand** to view the full report inline; tap **Collapse** to return to the preview.
+
 ## Project Status
 
 **Current:** MVP complete — 4-stage pipeline functional, demo-ready
+
+**Recent:** Portrait lock + expandable truncated outputs
 
 **Next:** Integration with live DQ feed (replace file drop with real-time API)
 
