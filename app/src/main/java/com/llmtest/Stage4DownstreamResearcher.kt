@@ -35,6 +35,24 @@ object Stage4DownstreamResearcher {
         // Parse pattern info from stage 3
         val patternLines = stage3State.patternResult?.split("\n") ?: emptyList()
         val ownerLoad = patternLines.find { it.contains("OWNER_LOAD") }?.substringAfter(":")?.trim() ?: "Unknown"
+        
+        // Load group context for entity group impact
+        val entities = loadEntities()
+        val entity = entities.find { it.linkedDatasetName == alert.datasetName }
+        val entityGroups = loadEntityGroups()
+        val group = entityGroups.find { it.entityGroup == entity?.entityGroup }
+        
+        val allAlerts = loadAlerts()
+        val currentGroup = entity?.entityGroup
+        val groupDatasetsList = entities
+            .filter { it.entityGroup == currentGroup }
+            .map { it.linkedDatasetName }
+            .toSet()
+        val groupAlerts = allAlerts.filter { groupDatasetsList.contains(it.datasetName) }
+        val groupPassing = groupAlerts.count { it.evaluationStatus == "pass" }
+        val groupTotal = groupAlerts.size
+        val healthScore = if (groupTotal > 0) groupPassing.toFloat() / groupTotal else 1.0f
+        val groupDatasets = groupDatasetsList.size
 
         // Build deep impact prompt
         val prompt = buildString {
@@ -65,6 +83,21 @@ object Stage4DownstreamResearcher {
             appendLine("Check Type: ${alert.checkName}")
             appendLine("Dataset: ${alert.datasetName}")
             appendLine("Owner Workload: ${alert.ownerEmail} has $ownerLoad other Critical failures open")
+            appendLine()
+            
+            appendLine("=== ENTITY GROUP IMPACT ===")
+            appendLine("Business Function: ${entity?.entityGroup}")
+            appendLine("Group Datasets: ${groupDatasets}")
+            appendLine("Group Health: ${(healthScore * 100).toInt()}%")
+            appendLine("Group Failing: ${groupTotal - groupPassing} of ${groupTotal} datasets")
+            appendLine("Group Owner: ${group?.ownerEmail}")
+            appendLine()
+            appendLine("=== INSTRUCTION ===")
+            appendLine("You are a Business Impact Analyst.")
+            appendLine("${alert.datasetName} is one of ${groupDatasets} datasets in ${entity?.entityGroup}.")
+            appendLine("Assess cascade risk across the ENTIRE group, not just this one dataset.")
+            appendLine("If ${entity?.entityGroup} degrades further, which downstream reports break first?")
+            appendLine("Prioritize Class 2 (Executive) reports that consume ANY dataset in this group.")
             appendLine()
             
             appendLine("=== YOUR TASK ===")
@@ -136,6 +169,33 @@ object Stage4DownstreamResearcher {
             json.decodeFromString(DQKnowledge.serializer(), content)
         } catch (e: Exception) {
             DQKnowledge(emptyMap(), emptyMap(), KPIThresholds(0.85f, 0.60f, emptyMap(), emptyList()))
+        }
+    }
+
+    private fun loadEntities(): List<Entity> {
+        return try {
+            val content = GhostPaths.ENTITIES.readText()
+            json.decodeFromString(ListSerializer(Entity.serializer()), content)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun loadEntityGroups(): List<EntityGroup> {
+        return try {
+            val content = GhostPaths.ENTITY_GROUPS.readText()
+            json.decodeFromString(ListSerializer(EntityGroup.serializer()), content)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun loadAlerts(): List<DQAlert> {
+        return try {
+            val content = GhostPaths.DQ_ALERTS.readText()
+            json.decodeFromString(ListSerializer(DQAlert.serializer()), content)
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 }

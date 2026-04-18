@@ -20,6 +20,7 @@ object GhostPaths {
     val CATALOG = File(DQ_DATA_DIR, "catalog_columns.json")
     val REPORTS = File(DQ_DATA_DIR, "reports.json")
     val DQ_KNOWLEDGE = File(DQ_DATA_DIR, "dq_knowledge.json")
+    val GOVERNANCE_SCHEMA = File(DQ_DATA_DIR, "governance_schema.json")
     
     // State file helpers
     fun stateFile(stage: Int) = File(DQ_STATE_DIR, "stage${stage}.json")

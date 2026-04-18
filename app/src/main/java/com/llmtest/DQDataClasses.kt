@@ -74,5 +74,8 @@ data class AnalysisState(
     val finalReport: String? = null,
     val ownerLoad: Int? = null,
     val healthScore: Float? = null,
-    val patternType: String? = null
+    val patternType: String? = null,
+    val groupName: String? = null,
+    val groupDatasets: Int? = null,
+    val groupHealthScore: Float? = null
 )

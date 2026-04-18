@@ -31,11 +31,31 @@ object Stage4Synthesizer {
         val severityRule = knowledge.severityRules[alert.severity]
         val dimensionDef = knowledge.dimensions[alert.dimension]
 
-        // Parse pattern for systemic context
-        val patternLines = stage3State.patternResult?.split("\n") ?: emptyList()
-        val ownerLoad = patternLines.find { it.contains("OWNER_LOAD") }?.substringAfter(":")?.trim() ?: "Unknown"
-        val healthScore = patternLines.find { it.contains("GROUP_HEALTH") }?.substringAfter(":")?.trim() ?: "Unknown"
-        val patternType = patternLines.find { it.contains("PATTERN:") }?.substringAfter(":")?.trim() ?: "isolated"
+        // Load governance context
+        val entities = loadEntities()
+        val entity = entities.find { it.linkedDatasetName == alert.datasetName }
+        val entityGroups = loadEntityGroups()
+        val group = entityGroups.find { it.entityGroup == entity?.entityGroup }
+        
+        val catalog = loadCatalog()
+        val primaryColumn = catalog.filter { it.linkedDatasetName == alert.datasetName }.firstOrNull()
+        
+        val reports = loadReports()
+        val affectedReports = reports.filter { it.dataSources.contains(alert.datasetName) }
+        
+        val allAlerts = loadAlerts()
+        val currentGroup = entity?.entityGroup
+        val groupDatasetsList = entities
+            .filter { it.entityGroup == currentGroup }
+            .map { it.linkedDatasetName }
+            .toSet()
+        val groupAlerts = allAlerts.filter { groupDatasetsList.contains(it.datasetName) }
+        val groupPassing = groupAlerts.count { it.evaluationStatus == "pass" }
+        val groupTotal = groupAlerts.size
+        val healthScore = stage3State.groupHealthScore ?: if (groupTotal > 0) groupPassing.toFloat() / groupTotal else 1.0f
+        val groupDatasets = stage3State.groupDatasets ?: groupDatasetsList.size
+        val ownerLoad = stage3State.ownerLoad ?: 0
+        val patternType = stage3State.patternType ?: "isolated"
 
         // Build synthesis prompt
         val prompt = buildString {
@@ -49,38 +69,26 @@ object Stage4Synthesizer {
             appendLine("=== BUSINESS IMPACT ANALYSIS (from Downstream Researcher) ===")
             appendLine(stage4b.downstreamReport.take(800)) // Truncate if too long
             appendLine()
-            appendLine("=== SYSTEMIC CONTEXT ===")
-            appendLine("Alert Owner: ${alert.ownerEmail}")
-            appendLine("Owner Workload: $ownerLoad other Critical failures")
-            appendLine("Entity Group Health: $healthScore")
-            appendLine("Pattern Detected: $patternType")
-            appendLine("KPI Resolution Target: ${severityRule?.kpiTargetDays ?: "N/A"} business days")
-            appendLine("DQ Dimension: ${alert.dimension} (${dimensionDef?.definition?.take(50)}...)")
+            appendLine("=== GOVERNANCE HIERARCHY ===")
+            appendLine("Technical: ${alert.datasourceName} (${alert.datasourceType}) → ${primaryColumn?.sourceDB}.${primaryColumn?.sourceTable}")
+            appendLine("Business: ${entity?.entityName} → ${entity?.entityGroup}")
+            appendLine("Organizational: ${group?.ownerEmail} manages ${groupDatasets} datasets in ${entity?.entityGroup}")
+            appendLine("Downstream: ${affectedReports.size} reports affected")
+            appendLine("Group Health: ${(healthScore * 100).toInt()}%")
             appendLine()
             
-            appendLine("=== YOUR TASK: EXECUTIVE STEWARDSHIP REPORT ===")
-            appendLine("Synthesize the above research into a compelling executive narrative (350-400 words) with this structure:")
+            appendLine("=== INSTRUCTION ===")
+            appendLine("You are a Senior Data Steward briefing the CDO.")
+            appendLine("Synthesize cross-layer risk: connect technical root cause → business function → organizational capacity.")
+            appendLine("Structure your narrative:")
+            appendLine("1. SITUATION: What broke and why it matters NOW")
+            appendLine("2. TECHNICAL ROOT CAUSE: Source system failure with confidence")
+            appendLine("3. BUSINESS IMPACT: ${entity?.entityGroup} function degrading (${groupDatasets} datasets, ${groupTotal - groupPassing} failing)")
+            appendLine("4. ORGANIZATIONAL RISK: ${group?.ownerEmail} capacity with multiple concurrent failures")
+            appendLine("5. CASCADING THREAT: Predict next 24-48 hours if unresolved")
+            appendLine("6. ACTIONABLE RECOMMENDATIONS: Immediate, short-term, governance")
             appendLine()
-            appendLine("**SITUATION** (1 paragraph)")
-            appendLine("Hook: What broke and why it matters RIGHT NOW. One sentence urgency statement.")
-            appendLine()
-            appendLine("**TECHNICAL ANALYSIS** (1 paragraph)")
-            appendLine("Translate technical findings into business language. Root cause with confidence. Mechanism of failure.")
-            appendLine()
-            appendLine("**BUSINESS IMPACT** (1 paragraph)")
-            appendLine("Who is affected, by when, and with what consequence? Decision-makers who will act on bad data.")
-            appendLine()
-            appendLine("**SYSTEMIC CONTEXT** (1 paragraph)")
-            appendLine("Connect to owner workload pattern. Isolated incident or governance gap? Historical pattern insight.")
-            appendLine()
-            appendLine("**ACTIONABLE RECOMMENDATIONS** (bullet list)")
-            appendLine("- Immediate (next 4 hours): Specific person to call, specific action")
-            appendLine("- Short-term (today): Fix strategy with technical approach")
-            appendLine("- Governance (this week): Process improvement to prevent recurrence")
-            appendLine()
-            appendLine("**RISK IF UNADDRESSED** (1 paragraph)")
-            appendLine("What happens if this sits for ${severityRule?.kpiTargetDays} days? Cascade effects?")
-            appendLine()
+            
             appendLine("TONE: Urgent but authoritative. Expert investigator briefing leadership. No hedging—state conclusions.")
             appendLine("Use actual names from the research reports. Make it feel like a senior steward who investigated for 2 hours.")
         }
@@ -145,6 +153,51 @@ object Stage4Synthesizer {
             json.decodeFromString(DQKnowledge.serializer(), content)
         } catch (e: Exception) {
             DQKnowledge(emptyMap(), emptyMap(), KPIThresholds(0.85f, 0.60f, emptyMap(), emptyList()))
+        }
+    }
+
+    private fun loadEntities(): List<Entity> {
+        return try {
+            val content = GhostPaths.ENTITIES.readText()
+            json.decodeFromString(ListSerializer(Entity.serializer()), content)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun loadEntityGroups(): List<EntityGroup> {
+        return try {
+            val content = GhostPaths.ENTITY_GROUPS.readText()
+            json.decodeFromString(ListSerializer(EntityGroup.serializer()), content)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun loadCatalog(): List<CatalogColumn> {
+        return try {
+            val content = GhostPaths.CATALOG.readText()
+            json.decodeFromString(ListSerializer(CatalogColumn.serializer()), content)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun loadReports(): List<Report> {
+        return try {
+            val content = GhostPaths.REPORTS.readText()
+            json.decodeFromString(ListSerializer(Report.serializer()), content)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun loadAlerts(): List<DQAlert> {
+        return try {
+            val content = GhostPaths.DQ_ALERTS.readText()
+            json.decodeFromString(ListSerializer(DQAlert.serializer()), content)
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 }

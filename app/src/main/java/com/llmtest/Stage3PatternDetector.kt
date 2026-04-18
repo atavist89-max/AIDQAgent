@@ -61,7 +61,10 @@ object Stage3PatternDetector {
             patternResult = patternResult,
             ownerLoad = ownerFailures.size,
             healthScore = healthScore,
-            patternType = patternType
+            patternType = patternType,
+            groupName = currentGroup,
+            groupDatasets = groupDatasets.size,
+            groupHealthScore = healthScore
         )
         
         GhostPaths.stateFile(3).writeText(json.encodeToString(AnalysisState.serializer(), state))

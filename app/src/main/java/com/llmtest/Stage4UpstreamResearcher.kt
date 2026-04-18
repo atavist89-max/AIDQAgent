@@ -35,6 +35,19 @@ object Stage4UpstreamResearcher {
         
         val knowledge = loadKnowledge()
         val dimensionDef = knowledge.dimensions[alert.dimension]
+        
+        // Load group context for governance hierarchy
+        val allAlerts = loadAlerts()
+        val currentGroup = entity?.entityGroup
+        val groupDatasetsList = entities
+            .filter { it.entityGroup == currentGroup }
+            .map { it.linkedDatasetName }
+            .toSet()
+        val groupAlerts = allAlerts.filter { groupDatasetsList.contains(it.datasetName) }
+        val groupPassing = groupAlerts.count { it.evaluationStatus == "pass" }
+        val groupTotal = groupAlerts.size
+        val healthScore = if (groupTotal > 0) groupPassing.toFloat() / groupTotal else 1.0f
+        val groupDatasets = groupDatasetsList.size
 
         // Build deep technical prompt
         val prompt = buildString {
@@ -62,6 +75,20 @@ object Stage4UpstreamResearcher {
             appendLine("Definition: ${dimensionDef?.definition ?: "N/A"}")
             appendLine("Risk Type: ${dimensionDef?.riskType ?: "N/A"}")
             appendLine("Check Failed: ${alert.checkName}")
+            appendLine()
+            
+            appendLine("=== GOVERNANCE HIERARCHY ===")
+            appendLine("Technical Layer: ${alert.datasourceName} (${alert.datasourceType}) → ${primaryColumn?.sourceDB}.${primaryColumn?.sourceTable}")
+            appendLine("Business Layer: ${entity?.entityName} → Group: ${entity?.entityGroup}")
+            appendLine("Organizational Layer: Group ${entity?.entityGroup} contains ${groupDatasets} datasets")
+            appendLine("Group Health: ${(healthScore * 100).toInt()}% (${groupPassing}/${groupTotal} passing)")
+            appendLine()
+            appendLine("=== INSTRUCTION ===")
+            appendLine("You are investigating a Technical Data Architect.")
+            appendLine("This dataset belongs to the ${entity?.entityGroup} business function.")
+            appendLine("Analyze ${alert.datasourceName} as infrastructure supporting ${groupDatasets} datasets in this group.")
+            appendLine("If this is a source system failure, estimate how many other group datasets are at risk.")
+            appendLine("Do not treat this as an isolated table failure — assess group-wide technical impact.")
             appendLine()
             
             appendLine("=== YOUR TASK ===")
@@ -127,6 +154,15 @@ object Stage4UpstreamResearcher {
         return try {
             val content = GhostPaths.CATALOG.readText()
             json.decodeFromString(ListSerializer(CatalogColumn.serializer()), content)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun loadAlerts(): List<DQAlert> {
+        return try {
+            val content = GhostPaths.DQ_ALERTS.readText()
+            json.decodeFromString(ListSerializer(DQAlert.serializer()), content)
         } catch (e: Exception) {
             emptyList()
         }
