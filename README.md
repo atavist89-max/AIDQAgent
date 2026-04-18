@@ -167,7 +167,7 @@ The system consumes 5 integrated data sources:
 1. **Screen Mirroring:** Use scrcpy, Samsung Link to Windows, or AirDroid to mirror S25+ to laptop
 2. **Data Preparation:** Pre-load `dq_alerts.json` with 1 "completed" analysis for credibility
 3. **Open the App:** Tap "Create" tab in the Bottom Navigation Bar
-4. **Build the Alert:** Select `postgres` → `beta_hub` → `LINK_ORDER_CUSTOMER`. Watch auto-fill populate severity (Critical), dimension (Adaptability), and owner email.
+4. **Build the Alert:** Select `postgres` → `beta_hub` → `LINK_ORDER_CUSTOMER` → choose from 5–7 check names. Watch auto-fill populate severity, dimension, and owner email for that specific check.
 5. **Send:** Tap "Send DQ Alert" → Toast confirms delivery
 6. **Switch to Analyze:** Tap "Analyze" tab. Watch 6-stage progression (Triage → Context → Pattern → Upstream → Downstream → Synthesis)
 7. **The Reveal:** Executive Stewardship Report appears with technical briefing, impact assessment, and actionable recommendations

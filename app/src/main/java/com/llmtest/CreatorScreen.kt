@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -30,18 +32,15 @@ fun CreatorScreen() {
     // Lookup data loaded from JSON
     var typeToSources by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
     var sourceToDatasets by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
-    var datasetToDefaults by remember { mutableStateOf<Map<String, AlertDefaults>>(emptyMap()) }
-    var datasetToOwner by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var datasetToChecks by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+    var checkToMetadata by remember { mutableStateOf<Map<String, AlertMetadata>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Form state
+    // Form state — 4 tiers + auto-filled fields
     var selectedType by rememberSaveable { mutableStateOf("") }
     var selectedSource by rememberSaveable { mutableStateOf("") }
     var selectedDataset by rememberSaveable { mutableStateOf("") }
-    var checkName by rememberSaveable { mutableStateOf("") }
-    var severity by rememberSaveable { mutableStateOf("") }
-    var dimension by rememberSaveable { mutableStateOf("") }
-    var ownerEmail by rememberSaveable { mutableStateOf("") }
+    var selectedCheck by rememberSaveable { mutableStateOf("") }
     var evaluationStatus by rememberSaveable { mutableStateOf("fail") }
     var lastCheckRunTime by rememberSaveable { mutableStateOf("") }
 
@@ -49,22 +48,21 @@ fun CreatorScreen() {
     var typeExpanded by remember { mutableStateOf(false) }
     var sourceExpanded by remember { mutableStateOf(false) }
     var datasetExpanded by remember { mutableStateOf(false) }
+    var checkExpanded by remember { mutableStateOf(false) }
     var statusExpanded by remember { mutableStateOf(false) }
 
     // Load data on first composition
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            val (typeMap, sourceMap, defaultsMap) = loadAlertLookups()
-            val ownerMap = loadEntityOwners()
+            val (typeMap, sourceMap, checkMap, metaMap) = loadAlertLookups()
             typeToSources = typeMap.mapValues { it.value.sorted() }
             sourceToDatasets = sourceMap.mapValues { it.value.sorted() }
-            datasetToDefaults = defaultsMap
-            datasetToOwner = ownerMap
+            datasetToChecks = checkMap.mapValues { it.value.sorted() }
+            checkToMetadata = metaMap
             isLoading = false
 
-            // Set default timestamp
             if (lastCheckRunTime.isEmpty()) {
-                lastCheckRunTime = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(Date())
+                lastCheckRunTime = SimpleDateFormat("MM/dd/yyyy", Locale.US).format(Date())
             }
         }
     }
@@ -76,23 +74,24 @@ fun CreatorScreen() {
     val availableDatasets = remember(selectedSource) {
         sourceToDatasets[selectedSource]?.sorted() ?: emptyList()
     }
+    val availableChecks = remember(selectedDataset) {
+        datasetToChecks[selectedDataset]?.sorted() ?: emptyList()
+    }
 
-    // Auto-fill when dataset changes
-    LaunchedEffect(selectedDataset) {
-        if (selectedDataset.isNotEmpty()) {
-            datasetToDefaults[selectedDataset]?.let { defaults ->
-                checkName = defaults.checkName
-                severity = defaults.severity
-                dimension = defaults.dimension
-            }
-            datasetToOwner[selectedDataset]?.let { owner ->
-                ownerEmail = owner
+    // Auto-fill when CHECK_NAME selected (Tier 4)
+    LaunchedEffect(selectedCheck) {
+        if (selectedCheck.isNotEmpty() && selectedDataset.isNotEmpty()) {
+            val key = "$selectedDataset|$selectedCheck"
+            checkToMetadata[key]?.let { meta ->
+                evaluationStatus = meta.evaluationStatus
+                lastCheckRunTime = meta.lastCheckRunTime
             }
         }
     }
 
-    // Send enabled when all 3 tiers selected
-    val canSend = selectedType.isNotEmpty() && selectedSource.isNotEmpty() && selectedDataset.isNotEmpty()
+    // Send enabled when all 4 tiers selected
+    val canSend = selectedType.isNotEmpty() && selectedSource.isNotEmpty() &&
+            selectedDataset.isNotEmpty() && selectedCheck.isNotEmpty()
 
     if (isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -109,7 +108,6 @@ fun CreatorScreen() {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Create DQ Alert", style = MaterialTheme.typography.headlineSmall)
-
         Spacer(modifier = Modifier.height(8.dp))
 
         // Tier 1: DATASOURCE_TYPE
@@ -138,6 +136,7 @@ fun CreatorScreen() {
                             selectedType = type
                             selectedSource = ""
                             selectedDataset = ""
+                            selectedCheck = ""
                             typeExpanded = false
                         }
                     )
@@ -171,6 +170,7 @@ fun CreatorScreen() {
                         onClick = {
                             selectedSource = source
                             selectedDataset = ""
+                            selectedCheck = ""
                             sourceExpanded = false
                         }
                     )
@@ -203,7 +203,40 @@ fun CreatorScreen() {
                         text = { Text(dataset) },
                         onClick = {
                             selectedDataset = dataset
+                            selectedCheck = ""
                             datasetExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        // Tier 4: CHECK_NAME
+        ExposedDropdownMenuBox(
+            expanded = checkExpanded,
+            onExpandedChange = { checkExpanded = it }
+        ) {
+            OutlinedTextField(
+                value = selectedCheck,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Check Name *") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = checkExpanded) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(),
+                enabled = selectedDataset.isNotEmpty()
+            )
+            ExposedDropdownMenu(
+                expanded = checkExpanded,
+                onDismissRequest = { checkExpanded = false }
+            ) {
+                availableChecks.forEach { check ->
+                    DropdownMenuItem(
+                        text = { Text(check) },
+                        onClick = {
+                            selectedCheck = check
+                            checkExpanded = false
                         }
                     )
                 }
@@ -213,32 +246,32 @@ fun CreatorScreen() {
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
         // Auto-filled fields (editable)
-        OutlinedTextField(
-            value = checkName,
-            onValueChange = { checkName = it },
-            label = { Text("Check Name") },
-            modifier = Modifier.fillMaxWidth()
-        )
+        val meta = if (selectedCheck.isNotEmpty() && selectedDataset.isNotEmpty()) {
+            checkToMetadata["$selectedDataset|$selectedCheck"]
+        } else null
 
         OutlinedTextField(
-            value = severity,
-            onValueChange = { severity = it },
+            value = meta?.severity ?: "",
+            onValueChange = { /* read-only for now, or make editable if needed */ },
             label = { Text("Severity") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            readOnly = true
         )
 
         OutlinedTextField(
-            value = dimension,
-            onValueChange = { dimension = it },
+            value = meta?.dimension ?: "",
+            onValueChange = { },
             label = { Text("Dimension") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            readOnly = true
         )
 
         OutlinedTextField(
-            value = ownerEmail,
-            onValueChange = { ownerEmail = it },
+            value = meta?.ownerEmail ?: "",
+            onValueChange = { },
             label = { Text("Owner Email") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            readOnly = true
         )
 
         OutlinedTextField(
@@ -286,13 +319,13 @@ fun CreatorScreen() {
                 val alert = DQAlert(
                     lastCheckRunTime = lastCheckRunTime,
                     evaluationStatus = evaluationStatus,
-                    checkName = checkName,
+                    checkName = selectedCheck,
                     datasetName = selectedDataset,
                     datasourceName = selectedSource,
                     datasourceType = selectedType,
-                    ownerEmail = ownerEmail,
-                    severity = severity,
-                    dimension = dimension
+                    ownerEmail = meta?.ownerEmail ?: "",
+                    severity = meta?.severity ?: "",
+                    dimension = meta?.dimension ?: ""
                 )
                 scope.launch(Dispatchers.IO) {
                     try {
@@ -320,7 +353,7 @@ fun CreatorScreen() {
 
         if (!canSend) {
             Text(
-                "Select Type, Source, and Dataset to enable sending",
+                "Select Type, Source, Dataset, and Check to enable sending",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
@@ -329,18 +362,25 @@ fun CreatorScreen() {
     }
 }
 
-// Data class for dataset defaults lookup
-data class AlertDefaults(
+// Data class for check-level metadata lookup
+data class AlertMetadata(
     val checkName: String,
+    val datasetName: String,
     val severity: String,
-    val dimension: String
+    val dimension: String,
+    val ownerEmail: String,
+    val datasourceName: String,
+    val datasourceType: String,
+    val evaluationStatus: String,
+    val lastCheckRunTime: String
 )
 
-private fun loadAlertLookups(): Triple<Map<String, Set<String>>, Map<String, Set<String>>, Map<String, AlertDefaults>> {
+private fun loadAlertLookups(): Quadruple<Map<String, Set<String>>, Map<String, Set<String>>, Map<String, Set<String>>, Map<String, AlertMetadata>> {
     val json = Json { ignoreUnknownKeys = true }
     val typeToSources = mutableMapOf<String, MutableSet<String>>()
     val sourceToDatasets = mutableMapOf<String, MutableSet<String>>()
-    val datasetToDefaults = mutableMapOf<String, AlertDefaults>()
+    val datasetToChecks = mutableMapOf<String, MutableSet<String>>()
+    val checkToMetadata = mutableMapOf<String, AlertMetadata>()
 
     try {
         val content = GhostPaths.DQ_ALERTS.readText()
@@ -350,37 +390,34 @@ private fun loadAlertLookups(): Triple<Map<String, Set<String>>, Map<String, Set
             val type = alert.datasourceType ?: "unknown"
             val source = alert.datasourceName
             val dataset = alert.datasetName
+            val check = alert.checkName
+            val key = "$dataset|$check"
 
             typeToSources.getOrPut(type) { mutableSetOf() }.add(source)
             sourceToDatasets.getOrPut(source) { mutableSetOf() }.add(dataset)
+            datasetToChecks.getOrPut(dataset) { mutableSetOf() }.add(check)
 
-            // Keep the most recent defaults (if multiple alerts for same dataset)
-            datasetToDefaults[dataset] = AlertDefaults(
-                checkName = alert.checkName,
-                severity = alert.severity,
-                dimension = alert.dimension
-            )
+            // Store first match (POC scope — no deduplication needed)
+            if (!checkToMetadata.containsKey(key)) {
+                checkToMetadata[key] = AlertMetadata(
+                    checkName = check,
+                    datasetName = dataset,
+                    severity = alert.severity,
+                    dimension = alert.dimension,
+                    ownerEmail = alert.ownerEmail,
+                    datasourceName = source,
+                    datasourceType = type,
+                    evaluationStatus = alert.evaluationStatus,
+                    lastCheckRunTime = alert.lastCheckRunTime
+                )
+            }
         }
     } catch (e: Exception) {
         BugLogger.logError("Failed to load alert lookups", e)
     }
 
-    return Triple(typeToSources, sourceToDatasets, datasetToDefaults)
+    return Quadruple(typeToSources, sourceToDatasets, datasetToChecks, checkToMetadata)
 }
 
-private fun loadEntityOwners(): Map<String, String> {
-    val json = Json { ignoreUnknownKeys = true }
-    val datasetToOwner = mutableMapOf<String, String>()
-
-    try {
-        val content = GhostPaths.ENTITIES.readText()
-        val entities = json.decodeFromString(ListSerializer(Entity.serializer()), content)
-        entities.forEach { entity ->
-            datasetToOwner[entity.linkedDatasetName] = entity.ownerEmail
-        }
-    } catch (e: Exception) {
-        BugLogger.logError("Failed to load entity owners", e)
-    }
-
-    return datasetToOwner
-}
+// Simple 4-tuple since Kotlin doesn't have one
+private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
