@@ -32,7 +32,9 @@ DQ Agent transforms raw DQ alerts into **executive intelligence** through a cons
 | **1. Triage** | Severity assessment + downstream report impact | ~400 | `FULL_ANALYSIS` or `MINIMAL` |
 | **2. Context Builder** | Entity lookup, column definitions, source system ID | ~1,200 | Condensed business context |
 | **3. Pattern Detector** | Owner workload correlation, entity group health | ~1,000 | Systemic issue detection |
-| **4. Synthesis** | LLM reasoning with accumulated context | ~1,800 | 4-line executive report |
+| **4a. Upstream Researcher** | Technical deep dive: architecture, root cause hypothesis | ~1,500 | Technical briefing (200-250 words) |
+| **4b. Downstream Researcher** | Business impact: cascade analysis, stakeholder priority | ~1,300 | Impact assessment (200-250 words) |
+| **4c. Synthesizer** | Executive narrative synthesizing both research reports | ~1,900 | Stewardship report (350-400 words) |
 
 **Constraint Management:** 10-second thermal cooldown between stages prevents GPU throttling on mobile hardware.
 
@@ -101,14 +103,17 @@ Token limit (~2,000) requires chunking. Each stage fits within budget while accu
 ├── app/build.gradle                # App-level build config (SDK 36, Compose, LiteRT-LM)
 ├── app/src/main/AndroidManifest.xml# App manifest: MANAGE_EXTERNAL_STORAGE + native libs
 ├── app/src/main/java/com/llmtest/
-│   ├── MainActivity.kt             # Entry point: UI (Jetpack Compose), engine init, file polling
+│   ├── MainActivity.kt             # Entry point: BottomNav + Create/Analyze screens, engine init, file polling
+│   ├── CreatorScreen.kt            # 3-tier cascading dropdown alert builder with auto-fill from JSON
 │   ├── GhostPaths.kt               # Centralized hard-coded paths to model, data, state, input
 │   ├── DQDataClasses.kt            # @Serializable data models: Alert, Entity, Report, Catalog, AnalysisState
-│   ├── DQPipelineManager.kt        # Orchestrates Stage 1→4 with 10s thermal cooldowns between each
+│   ├── DQPipelineManager.kt        # Orchestrates Stage 1→4a→4b→4c with 10s thermal cooldowns
 │   ├── Stage1Triage.kt             # Severity + downstream report impact → FULL_ANALYSIS or MINIMAL
 │   ├── Stage2ContextBuilder.kt     # Entity lookup, column defs, source system → condensed context string
 │   ├── Stage3PatternDetector.kt    # Owner workload correlation, group health → pattern detection
-│   ├── Stage4Synthesis.kt          # Builds prompt, calls Gemma via LiteRT-LM → 4-line executive report
+│   ├── Stage4UpstreamResearcher.kt # Technical Data Architect: root cause hypothesis + investigation path
+│   ├── Stage4DownstreamResearcher.kt# Business Impact Analyst: cascade + stakeholder notification priority
+│   ├── Stage4Synthesizer.kt        # Senior Data Steward: executive narrative for CDO briefing
 │   ├── EntityData.kt               # Legacy entity info data class (pre-DQ pipeline)
 │   └── BugLogger.kt                # File-based timestamped logger (logs/bug_log.txt)
 ├── build.gradle                    # Root project plugins (Android, Kotlin, Compose, Serialization)
@@ -122,14 +127,17 @@ Token limit (~2,000) requires chunking. Each stage fits within budget while accu
 
 | File | Responsibility |
 |------|----------------|
-| `MainActivity.kt` | Jetpack Compose UI with stage indicator, progress bar, and report card. Initializes the LiteRT-LM engine and starts a 5-second file poll loop on `demo_input/new_alert.json`. |
+| `MainActivity.kt` | Entry point with BottomNavigationBar (Create + Analyze tabs). Initializes LiteRT-LM engine and starts 5-second file poll loop on `demo_input/new_alert.json`. |
+| `CreatorScreen.kt` | 3-tier cascading dropdown form (Type → Source → Dataset). Auto-fills check name, severity, dimension, and owner email from JSON lookups. Writes alert JSON to `demo_input/new_alert.json`. |
 | `GhostPaths.kt` | Single source of truth for all absolute file paths on device. Validates model availability (`>1GB`) and DQ data directory presence. |
-| `DQDataClasses.kt` | Kotlinx Serialization data classes consumed by all stages. `AnalysisState` is the accumulator passed from Stage 1→4. |
-| `DQPipelineManager.kt` | CoroutineScope-driven orchestrator. Handles stage progression, 10s `delay()` cooldowns, and early-exit for `MINIMAL` alerts. |
+| `DQDataClasses.kt` | Kotlinx Serialization data classes consumed by all stages. `AnalysisState` is the accumulator passed from Stage 1→4c. |
+| `DQPipelineManager.kt` | CoroutineScope-driven orchestrator. Handles stage progression through 1→2→3→4a→4b→4c with 10s `delay()` cooldowns. Early-exit for `MINIMAL` alerts. |
 | `Stage1Triage.kt` | Loads `reports.json`, checks if the alert dataset feeds any executive (`Class 2`) reports. Decides `FULL_ANALYSIS` vs `MINIMAL`. Writes `stage1.json`. |
 | `Stage2ContextBuilder.kt` | Loads `entities.json`, `catalog_columns.json`, `entity_groups.json`. Builds a condensed business context string (<1,200 tokens). Writes `stage2.json`. |
 | `Stage3PatternDetector.kt` | Loads `dq_alerts.json` to count owner failures and compute entity group health score. Detects `owner_overload`, `group_collapse`, or `isolated_incident`. Writes `stage3.json`. |
-| `Stage4Synthesis.kt` | Loads `dq_knowledge.json` for severity rules and dimension definitions. Constructs a constrained prompt (~1,800 tokens) and calls Gemma. Writes `stage4.json`. Falls back to a templated report if LLM fails. |
+| `Stage4UpstreamResearcher.kt` | Technical Data Architect sub-agent. Analyzes source system architecture, builds root cause hypothesis with confidence, and defines investigation path. Writes `stage4a.json`. |
+| `Stage4DownstreamResearcher.kt` | Business Impact Analyst sub-agent. Assesses cascade chains, stakeholder notification priority by report class, and time sensitivity. Writes `stage4b.json`. |
+| `Stage4Synthesizer.kt` | Senior Data Steward sub-agent. Synthesizes upstream + downstream research into a 350-400 word executive narrative for CDO briefing. Writes `stage4c.json`. |
 | `BugLogger.kt` | Thread-safe file logger. Logs every stage transition, file I/O error, and LLM exception to app-private storage. Accessible via "Logs" button in UI. |
 
 ---
@@ -158,12 +166,15 @@ The system consumes 5 integrated data sources:
 
 1. **Screen Mirroring:** Use scrcpy, Samsung Link to Windows, or AirDroid to mirror S25+ to laptop
 2. **Data Preparation:** Pre-load `dq_alerts.json` with 1 "completed" analysis for credibility
-3. **The Trigger:** Prepare `demo_alert.json` on laptop (specific: `LINK_ORDER_CUSTOMER`, Critical, Adaptability)
-4. **The Action:** Drag file to `DQAgent/demo_input/` during screenshare
-5. **The Theater:** Watch 4-stage progression (Triage → Context → Pattern → Synthesis)
-6. **The Reveal:** 4-line executive report appears with business impact, root cause, and specific action
+3. **Open the App:** Tap "Create" tab in the Bottom Navigation Bar
+4. **Build the Alert:** Select `postgres` → `beta_hub` → `LINK_ORDER_CUSTOMER`. Watch auto-fill populate severity (Critical), dimension (Adaptability), and owner email.
+5. **Send:** Tap "Send DQ Alert" → Toast confirms delivery
+6. **Switch to Analyze:** Tap "Analyze" tab. Watch 6-stage progression (Triage → Context → Pattern → Upstream → Downstream → Synthesis)
+7. **The Reveal:** Executive Stewardship Report appears with technical briefing, impact assessment, and actionable recommendations
 
-**Total demo time:** 90 seconds from drop to insight.
+**Total demo time:** 2 minutes from creation to insight.
+
+**Alternative (file drop still works):** Drag `demo_alert.json` to `DQAgent/demo_input/` for scripted presentations.
 
 ---
 

@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -59,7 +60,7 @@ class MainActivity : ComponentActivity() {
                     when {
                         !hasPermission.value -> PermissionRequestScreen()
                         !isInitialized.value -> LoadingScreen()
-                        else -> DQAgentScreen()
+                        else -> MainScaffold()
                     }
                 }
             }
@@ -173,6 +174,37 @@ class MainActivity : ComponentActivity() {
             ) {
                 CircularProgressIndicator()
                 Text(statusMessage.value)
+            }
+        }
+    }
+
+    @Composable
+    fun MainScaffold() {
+        var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+
+        Scaffold(
+            bottomBar = {
+                NavigationBar {
+                    NavigationBarItem(
+                        icon = { Text("+") },
+                        label = { Text("Create") },
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 }
+                    )
+                    NavigationBarItem(
+                        icon = { Text("A") },
+                        label = { Text("Analyze") },
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 }
+                    )
+                }
+            }
+        ) { paddingValues ->
+            Box(modifier = Modifier.padding(paddingValues)) {
+                when (selectedTab) {
+                    0 -> CreatorScreen()
+                    1 -> DQAgentScreen()
+                }
             }
         }
     }
