@@ -6,7 +6,7 @@
     
     <application
         android:allowBackup="true"
-        android:label="DQ Agent"
+        android:label="DQ Agent - Owner's Overview"
         android:theme="@android:style/Theme.Material.NoActionBar">
         
         <activity

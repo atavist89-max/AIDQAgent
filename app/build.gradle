@@ -10,7 +10,7 @@ android {
     compileSdk 36
     
     defaultConfig {
-        applicationId "com.llmtest"
+        applicationId "com.llmtest.ownersoverview"
         minSdk 36
         targetSdk 36
         versionCode 1
