@@ -22,6 +22,9 @@ object GhostPaths {
     val DQ_KNOWLEDGE = File(DQ_DATA_DIR, "dq_knowledge.json")
     val GOVERNANCE_SCHEMA = File(DQ_DATA_DIR, "governance_schema.json")
     
+    // Portfolio state
+    val PORTFOLIO_RISK_MAP = File(DQ_STATE_DIR, "portfolio_risk_map.json")
+    
     // State file helpers
     fun stateFile(stage: Int) = File(DQ_STATE_DIR, "stage${stage}.json")
     fun inputFile() = File(DQ_INPUT_DIR, "new_alert.json")

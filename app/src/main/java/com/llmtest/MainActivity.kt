@@ -210,7 +210,7 @@ class MainActivity : ComponentActivity() {
             Box(modifier = Modifier.padding(paddingValues)) {
                 when (selectedTab) {
                     0 -> CreatorScreen()
-                    1 -> PortfolioScreen()
+                    1 -> PortfolioScreen(engine)
                     2 -> DQAgentScreen()
                 }
             }
@@ -282,15 +282,38 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun PortfolioScreen() {
+    fun PortfolioScreen(engine: Engine?) {
         val scope = rememberCoroutineScope()
         var isLoading by remember { mutableStateOf(true) }
         var portfolioData by remember { mutableStateOf<PortfolioData?>(null) }
+        var riskMap by remember { mutableStateOf<String?>(null) }
+        var isRiskMapLoading by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) {
             withContext(Dispatchers.IO) {
                 portfolioData = loadPortfolioData()
+                // Try to load cached risk map
+                if (GhostPaths.PORTFOLIO_RISK_MAP.exists()) {
+                    riskMap = GhostPaths.PORTFOLIO_RISK_MAP.readText()
+                }
                 isLoading = false
+            }
+        }
+
+        fun generateRiskMap(ownerEmail: String) {
+            if (engine == null) return
+            isRiskMapLoading = true
+            scope.launch(Dispatchers.IO) {
+                val result = try {
+                    PortfolioRiskAnalyzer.analyze(ownerEmail, engine)
+                } catch (e: Exception) {
+                    BugLogger.logError("Risk map generation failed", e)
+                    "Risk map generation failed. Please try again."
+                }
+                withContext(Dispatchers.Main) {
+                    riskMap = result
+                    isRiskMapLoading = false
+                }
             }
         }
 
@@ -343,6 +366,55 @@ class MainActivity : ComponentActivity() {
                                 style = MaterialTheme.typography.titleSmall
                             )
                             Text("You have ${data.openCriticalError} open Critical/Error failures. This suggests a governance gap, not isolated incidents.")
+                        }
+                    }
+                }
+
+                // Dependency Risk Map
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "🗺️ Source System Dependency Risk Map",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (isRiskMapLoading) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                                Text(
+                                    "Analyzing infrastructure dependencies...",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        } else if (riskMap != null) {
+                            Text(
+                                riskMap!!,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        } else {
+                            Text(
+                                "Gemma will analyze your source system dependencies, identify concentration risks, and predict cascade paths across your portfolio.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(
+                            onClick = { generateRiskMap(data.ownerEmail) },
+                            enabled = !isRiskMapLoading && engine != null,
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(
+                                if (riskMap == null) "Generate Risk Map" else "Refresh Analysis",
+                                style = MaterialTheme.typography.labelSmall
+                            )
                         }
                     }
                 }
