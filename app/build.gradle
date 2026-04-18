@@ -32,7 +32,7 @@ android {
 
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach {
-            outputFileName = "DQ Agent - DQ Coordinator-${variant.versionName}.apk"
+            outputFileName = "DQ Agent - Owner's Overview-${variant.versionName}.apk"
         }
     }
 }
