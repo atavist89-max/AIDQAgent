@@ -79,3 +79,11 @@ data class AnalysisState(
     val groupDatasets: Int? = null,
     val groupHealthScore: Float? = null
 )
+
+@Serializable
+data class OwnerGuidanceState(
+    val stage: Int = 4,
+    val alertDataset: String,
+    val guidanceReport: String,
+    val timestamp: Long = System.currentTimeMillis()
+)

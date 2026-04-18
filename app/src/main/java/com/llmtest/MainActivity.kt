@@ -28,6 +28,7 @@ import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import kotlinx.coroutines.*
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 class MainActivity : ComponentActivity() {
@@ -132,7 +133,7 @@ class MainActivity : ComponentActivity() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text("DQ Agent", style = MaterialTheme.typography.headlineLarge)
+            Text("DQ Agent - Owner's Overview", style = MaterialTheme.typography.headlineLarge)
             Spacer(modifier = Modifier.height(32.dp))
             Text(
                 "Permission Required",
@@ -192,10 +193,16 @@ class MainActivity : ComponentActivity() {
                         onClick = { selectedTab = 0 }
                     )
                     NavigationBarItem(
-                        icon = { Text("A") },
-                        label = { Text("Analyze") },
+                        icon = { Text("P") },
+                        label = { Text("Portfolio") },
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 }
+                    )
+                    NavigationBarItem(
+                        icon = { Text("A") },
+                        label = { Text("Analyze") },
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 }
                     )
                 }
             }
@@ -203,7 +210,8 @@ class MainActivity : ComponentActivity() {
             Box(modifier = Modifier.padding(paddingValues)) {
                 when (selectedTab) {
                     0 -> CreatorScreen()
-                    1 -> DQAgentScreen()
+                    1 -> PortfolioScreen()
+                    2 -> DQAgentScreen()
                 }
             }
         }
@@ -274,16 +282,163 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
+    fun PortfolioScreen() {
+        val scope = rememberCoroutineScope()
+        var isLoading by remember { mutableStateOf(true) }
+        var portfolioData by remember { mutableStateOf<PortfolioData?>(null) }
+
+        LaunchedEffect(Unit) {
+            withContext(Dispatchers.IO) {
+                portfolioData = loadPortfolioData()
+                isLoading = false
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("My Portfolio", style = MaterialTheme.typography.headlineSmall)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (portfolioData == null) {
+                Text("No portfolio data available.", style = MaterialTheme.typography.bodyMedium)
+            } else {
+                val data = portfolioData!!
+
+                // Summary Card
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Owner: ${data.ownerEmail}", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Groups: ${data.groupCount} | Datasets: ${data.datasetCount}")
+                        Text("Overall Health: ${(data.overallHealth * 100).toInt()}%")
+                        if (data.openCriticalError > 0) {
+                            Text(
+                                "Open Critical/Error: ${data.openCriticalError}",
+                                color = Color(0xFFD32F2F),
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                        }
+                    }
+                }
+
+                // Workload Insight
+                if (data.patternType == "owner_overload") {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "⚠️ Systemic Overload Detected",
+                                color = Color(0xFFD32F2F),
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                            Text("You have ${data.openCriticalError} open Critical/Error failures. This suggests a governance gap, not isolated incidents.")
+                        }
+                    }
+                }
+
+                // Entity Groups
+                data.groups.forEach { group ->
+                    var expanded by rememberSaveable { mutableStateOf(false) }
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(group.groupName, style = MaterialTheme.typography.titleSmall)
+                            Text(group.description, style = MaterialTheme.typography.bodySmall)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LinearProgressIndicator(
+                                progress = { group.healthScore },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = when {
+                                    group.healthScore >= 0.85f -> Color(0xFF2E7D32)
+                                    group.healthScore >= 0.6f -> Color(0xFFF57C00)
+                                    else -> Color(0xFFD32F2F)
+                                }
+                            )
+                            Text("Health: ${(group.healthScore * 100).toInt()}% | Datasets: ${group.datasets.size}", style = MaterialTheme.typography.bodySmall)
+
+                            if (expanded) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                group.datasets.forEach { ds ->
+                                    val statusColor = if (ds.hasFailure) Color(0xFFD32F2F) else Color(0xFF2E7D32)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(ds.datasetName, style = MaterialTheme.typography.bodySmall)
+                                        Text(
+                                            if (ds.hasFailure) "FAIL" else "PASS",
+                                            color = statusColor,
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                }
+                            }
+
+                            TextButton(
+                                onClick = { expanded = !expanded },
+                                contentPadding = PaddingValues(0.dp),
+                                modifier = Modifier.height(24.dp)
+                            ) {
+                                Text(
+                                    if (expanded) "Collapse" else "Expand",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Recent Alerts
+                if (data.recentAlerts.isNotEmpty()) {
+                    Text("Recent Alerts", style = MaterialTheme.typography.titleMedium)
+                    data.recentAlerts.forEach { alert ->
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(alert.datasetName, style = MaterialTheme.typography.bodySmall)
+                                    Text(alert.checkName, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                }
+                                Text(
+                                    alert.severity,
+                                    color = when (alert.severity) {
+                                        "Critical" -> Color(0xFFD32F2F)
+                                        "Error" -> Color(0xFFF57C00)
+                                        else -> Color(0xFF2E7D32)
+                                    },
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
     fun DQAgentScreen() {
         val pm = pipelineManager ?: return
-        
+
         val stage by pm.currentStage.collectAsState()
         val s1 by pm.stage1Output.collectAsState()
         val s2 by pm.stage2Output.collectAsState()
         val s3 by pm.stage3Output.collectAsState()
         val s4 by pm.stage4Output.collectAsState()
-        val upstream by pm.upstreamReport.collectAsState()
-        val downstream by pm.downstreamReport.collectAsState()
 
         Column(
             modifier = Modifier.fillMaxSize()
@@ -296,10 +451,10 @@ class MainActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val headerText = when {
-                    stage == 50 -> "DQ Agent - Data Quality Report Complete"
-                    stage >= 41 -> "DQ Agent - Stage 4/4"
-                    stage >= 1 -> "DQ Agent - Stage $stage/4"
-                    else -> "DQ Agent - Stage 0/4"
+                    stage == 50 -> "Owner's Overview - Guidance Ready"
+                    stage >= 4 -> "Owner's Overview - Stage $stage/4"
+                    stage >= 1 -> "Owner's Overview - Stage $stage/4"
+                    else -> "Owner's Overview - Stage 0/4"
                 }
                 Text(
                     headerText,
@@ -327,54 +482,14 @@ class MainActivity : ComponentActivity() {
                     isComplete = stage > 3
                 )
 
-                if (stage >= 41) {
+                if (stage >= 4) {
                     StageBox(
-                        title = "Stage 4a: Upstream Researcher",
-                        content = upstream.take(150) + if (upstream.length > 150) "..." else "",
-                        fullContent = upstream,
-                        isActive = stage == 41,
-                        isComplete = stage > 41
-                    )
-                }
-
-                if (stage >= 42) {
-                    StageBox(
-                        title = "Stage 4b: Downstream Researcher",
-                        content = downstream.take(150) + if (downstream.length > 150) "..." else "",
-                        fullContent = downstream,
-                        isActive = stage == 42,
-                        isComplete = stage > 42
-                    )
-                }
-
-                if (stage >= 43) {
-                    StageBox(
-                        title = "Stage 4c: Synthesizer",
-                        content = "Executive Report: " + s4.take(100) + if (s4.length > 100) "..." else "",
-                        fullContent = "Executive Report: " + s4,
-                        isActive = stage == 43,
+                        title = "Stage 4: Owner Guidance",
+                        content = if (stage == 50) s4 else "Generating owner guidance...",
+                        fullContent = if (stage == 50) s4 else null,
+                        isActive = stage == 4,
                         isComplete = stage == 50
                     )
-                }
-
-                if (stage == 50 && s4.isNotEmpty()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp)
-                        ) {
-                            Text(
-                                "Executive Stewardship Report",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                s4,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
                 }
             }
 
@@ -427,7 +542,7 @@ class MainActivity : ComponentActivity() {
                     Text(
                         displayContent,
                         style = MaterialTheme.typography.bodySmall,
-                        maxLines = if (expanded || (isComplete && title.contains("Synthesis"))) Int.MAX_VALUE else 4,
+                        maxLines = if (expanded || (isComplete && title.contains("Owner Guidance"))) Int.MAX_VALUE else 4,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (canExpand) {
@@ -455,5 +570,133 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         pipelineManager?.cancel()
         engine?.close()
+    }
+}
+
+// Portfolio data models
+private data class PortfolioData(
+    val ownerEmail: String,
+    val groupCount: Int,
+    val datasetCount: Int,
+    val overallHealth: Float,
+    val openCriticalError: Int,
+    val patternType: String?,
+    val groups: List<PortfolioGroup>,
+    val recentAlerts: List<PortfolioAlert>
+)
+
+private data class PortfolioGroup(
+    val groupName: String,
+    val description: String,
+    val healthScore: Float,
+    val datasets: List<PortfolioDataset>
+)
+
+private data class PortfolioDataset(
+    val datasetName: String,
+    val hasFailure: Boolean
+)
+
+private data class PortfolioAlert(
+    val datasetName: String,
+    val checkName: String,
+    val severity: String
+)
+
+private fun loadPortfolioData(): PortfolioData? {
+    val json = Json { ignoreUnknownKeys = true }
+
+    return try {
+        // Load all data sources
+        val alerts = try {
+            json.decodeFromString(ListSerializer(DQAlert.serializer()), GhostPaths.DQ_ALERTS.readText())
+        } catch (e: Exception) { emptyList() }
+
+        val entities = try {
+            json.decodeFromString(ListSerializer(Entity.serializer()), GhostPaths.ENTITIES.readText())
+        } catch (e: Exception) { emptyList() }
+
+        val groups = try {
+            json.decodeFromString(ListSerializer(EntityGroup.serializer()), GhostPaths.ENTITY_GROUPS.readText())
+        } catch (e: Exception) { emptyList() }
+
+        // Derive current owner from most recent failing alert
+        val currentOwner = alerts
+            .filter { it.evaluationStatus == "fail" }
+            .maxByOrNull { it.lastCheckRunTime }
+            ?.ownerEmail
+            ?: alerts.firstOrNull()?.ownerEmail
+            ?: return null
+
+        // Owner's entities and groups
+        val ownerEntities = entities.filter { it.ownerEmail == currentOwner }
+        val ownerGroupNames = ownerEntities.map { it.entityGroup }.toSet()
+        val ownerGroups = groups.filter { it.entityGroup in ownerGroupNames }
+
+        // Owner's datasets
+        val ownerDatasets = ownerEntities.map { it.linkedDatasetName }.toSet()
+
+        // Open Critical/Error failures for this owner
+        val ownerFailures = alerts.filter {
+            it.ownerEmail == currentOwner &&
+                    it.evaluationStatus == "fail" &&
+                    it.severity in listOf("Critical", "Error")
+        }
+
+        // Pattern detection (same logic as Stage3)
+        val patternType = when {
+            ownerFailures.size > 2 -> "owner_overload"
+            else -> "isolated"
+        }
+
+        // Build per-group data
+        val portfolioGroups = ownerGroups.map { group ->
+            val groupEntities = ownerEntities.filter { it.entityGroup == group.entityGroup }
+            val groupDatasets = groupEntities.map { it.linkedDatasetName }.toSet()
+
+            val groupAlerts = alerts.filter { it.datasetName in groupDatasets }
+            val passing = groupAlerts.count { it.evaluationStatus == "pass" }
+            val total = groupAlerts.size
+            val health = if (total > 0) passing.toFloat() / total else 1.0f
+
+            val datasets = groupDatasets.map { ds ->
+                val hasFailure = alerts.any { it.datasetName == ds && it.evaluationStatus == "fail" }
+                PortfolioDataset(ds, hasFailure)
+            }.sortedBy { it.datasetName }
+
+            PortfolioGroup(
+                groupName = group.entityGroup,
+                description = group.description,
+                healthScore = health,
+                datasets = datasets
+            )
+        }
+
+        // Overall health (weighted average by dataset count)
+        val totalDatasets = portfolioGroups.sumOf { it.datasets.size }
+        val overallHealth = if (totalDatasets > 0) {
+            portfolioGroups.map { it.healthScore * it.datasets.size }.sum() / totalDatasets
+        } else 1.0f
+
+        // Recent alerts (last 5 failing for owner's datasets)
+        val recentAlerts = alerts
+            .filter { it.datasetName in ownerDatasets && it.evaluationStatus == "fail" }
+            .sortedByDescending { it.lastCheckRunTime }
+            .take(5)
+            .map { PortfolioAlert(it.datasetName, it.checkName, it.severity) }
+
+        PortfolioData(
+            ownerEmail = currentOwner,
+            groupCount = ownerGroups.size,
+            datasetCount = ownerDatasets.size,
+            overallHealth = overallHealth,
+            openCriticalError = ownerFailures.size,
+            patternType = patternType,
+            groups = portfolioGroups,
+            recentAlerts = recentAlerts
+        )
+    } catch (e: Exception) {
+        BugLogger.logError("Failed to load portfolio data", e)
+        null
     }
 }
