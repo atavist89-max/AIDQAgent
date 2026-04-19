@@ -114,7 +114,7 @@ fun AuditPlaybackScreen(onBack: () -> Unit = {}) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 100.dp, max = 300.dp),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                        textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace, fontSize = MaterialTheme.typography.labelSmall.fontSize)
                     )
                 }
             },
