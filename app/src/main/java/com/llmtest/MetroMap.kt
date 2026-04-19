@@ -487,6 +487,7 @@ private fun MetroMapCanvas(
         }
     }
 }
+}
 
 private data class StationDef(val label: String, val agentName: String, val agentId: String, val x: Float)
 private data class GateDef(val label: String, val x: Float, val afterStation: Int)
