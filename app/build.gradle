@@ -14,7 +14,7 @@ android {
         minSdk 36
         targetSdk 36
         versionCode 1
-        versionName "1.0"
+        versionName "DQ Agent - GaaS"
     }
     
     compileOptions {
@@ -29,6 +29,15 @@ android {
     buildFeatures {
         compose true
     }
+    
+    buildTypes {
+        debug {
+            applicationIdSuffix '.gaas'
+        }
+        release {
+            applicationIdSuffix '.gaas'
+        }
+    }
 }
 
 dependencies {
@@ -41,4 +50,5 @@ dependencies {
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.material3:material3'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0'
+    implementation 'androidx.compose.material:material-icons-extended'
 }

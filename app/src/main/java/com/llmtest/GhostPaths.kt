@@ -26,6 +26,12 @@ object GhostPaths {
     fun stateFile(stage: Int) = File(DQ_STATE_DIR, "stage${stage}.json")
     fun inputFile() = File(DQ_INPUT_DIR, "new_alert.json")
     
+    // GaaS governance files
+    val GAASTrustScores = File(DQ_DATA_DIR, "trust_scores.json")
+    val GAASPolicyRules = File(DQ_DATA_DIR, "policy_rules.json")
+    val GAASStateFile = File(DQ_STATE_DIR, "gaas_state.json")
+    val GAASAuditLog = File(DQ_STATE_DIR, "audit_log.jsonl")
+    
     // Validation
     fun isModelAvailable(): Boolean = MODEL_FILE.exists() && MODEL_FILE.length() > 1_000_000_000L
     fun isDQDataAvailable(): Boolean = DQ_DATA_DIR.exists() && DQ_ALERTS.exists()

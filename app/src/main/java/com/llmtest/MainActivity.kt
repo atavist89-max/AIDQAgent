@@ -109,6 +109,9 @@ class MainActivity : ComponentActivity() {
             val engineInstance = engine ?: throw IllegalStateException("Engine failed to initialize")
             pipelineManager = DQPipelineManager(engineInstance)
             
+            // Initialize GaaS governance layer
+            GaaSController.initialize()
+            
             // Start polling
             startFilePolling()
             
@@ -197,6 +200,12 @@ class MainActivity : ComponentActivity() {
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 }
                     )
+                    NavigationBarItem(
+                        icon = { Text("G") },
+                        label = { Text("Governance") },
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 }
+                    )
                 }
             }
         ) { paddingValues ->
@@ -204,6 +213,7 @@ class MainActivity : ComponentActivity() {
                 when (selectedTab) {
                     0 -> CreatorScreen()
                     1 -> DQAgentScreen()
+                    2 -> GovernanceScreen()
                 }
             }
         }
@@ -284,6 +294,54 @@ class MainActivity : ComponentActivity() {
         val s4 by pm.stage4Output.collectAsState()
         val upstream by pm.upstreamReport.collectAsState()
         val downstream by pm.downstreamReport.collectAsState()
+        
+        // GaaS governance state
+        val govStatus by GaaSController.governanceStatus.collectAsState()
+        val violationModal by GaaSController.violationModal.collectAsState()
+        val activeNegotiation by AgentNegotiator.activeNegotiations.collectAsState()
+        val pendingApprovals by EscalationRouter.pendingApprovals.collectAsState()
+
+        // Handle violation modal
+        violationModal?.let { violation ->
+            AlertDialog(
+                onDismissRequest = { },
+                title = { Text("🛡 Policy Violation") },
+                text = {
+                    Column {
+                        Text(violation.policyName, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(violation.reason)
+                        if (violation.triggeredContent != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Surface(
+                                color = Color(0xFFFFEBEE),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    violation.triggeredContent,
+                                    modifier = Modifier.padding(8.dp),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                        if (violation.remediation != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Remediation: ${violation.remediation}", color = Color(0xFF2E7D32))
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { GaaSController.resolveViolation(true) }) {
+                        Text("Approve & Continue")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { GaaSController.resolveViolation(false) }) {
+                        Text("Block")
+                    }
+                }
+            )
+        }
 
         Column(
             modifier = Modifier.fillMaxSize()
@@ -305,26 +363,34 @@ class MainActivity : ComponentActivity() {
                     headerText,
                     style = MaterialTheme.typography.headlineSmall
                 )
+                
+                // Governance status bar
+                if (govStatus != GovernanceStatus.PENDING) {
+                    GovernanceStatusChip(status = govStatus, pendingCount = pendingApprovals.size)
+                }
 
                 StageBox(
                     title = "Stage 1: Triage",
                     content = s1,
                     isActive = stage == 1,
-                    isComplete = stage > 1
+                    isComplete = stage > 1,
+                    governanceStatus = if (stage > 1) GovernanceStatus.APPROVED else if (stage == 1) govStatus else null
                 )
 
                 StageBox(
                     title = "Stage 2: Context Builder",
                     content = s2,
                     isActive = stage == 2,
-                    isComplete = stage > 2
+                    isComplete = stage > 2,
+                    governanceStatus = if (stage > 2) GovernanceStatus.APPROVED else if (stage == 2) govStatus else null
                 )
 
                 StageBox(
                     title = "Stage 3: Pattern Detection",
                     content = s3,
                     isActive = stage == 3,
-                    isComplete = stage > 3
+                    isComplete = stage > 3,
+                    governanceStatus = if (stage > 3) GovernanceStatus.APPROVED else if (stage == 3) govStatus else null
                 )
 
                 if (stage >= 41) {
@@ -333,7 +399,8 @@ class MainActivity : ComponentActivity() {
                         content = upstream.take(150) + if (upstream.length > 150) "..." else "",
                         fullContent = upstream,
                         isActive = stage == 41,
-                        isComplete = stage > 41
+                        isComplete = stage > 41,
+                        governanceStatus = if (stage > 41) GovernanceStatus.APPROVED else if (stage == 41) govStatus else null
                     )
                 }
 
@@ -343,7 +410,8 @@ class MainActivity : ComponentActivity() {
                         content = downstream.take(150) + if (downstream.length > 150) "..." else "",
                         fullContent = downstream,
                         isActive = stage == 42,
-                        isComplete = stage > 42
+                        isComplete = stage > 42,
+                        governanceStatus = if (stage > 42) GovernanceStatus.APPROVED else if (stage == 42) govStatus else null
                     )
                 }
 
@@ -353,8 +421,16 @@ class MainActivity : ComponentActivity() {
                         content = "Executive Report: " + s4.take(100) + if (s4.length > 100) "..." else "",
                         fullContent = "Executive Report: " + s4,
                         isActive = stage == 43,
-                        isComplete = stage == 50
+                        isComplete = stage == 50,
+                        governanceStatus = if (stage == 50) GovernanceStatus.APPROVED else if (stage == 43) govStatus else null
                     )
+                }
+                
+                // Active negotiation UI
+                activeNegotiation.firstOrNull()?.let { negotiation ->
+                    if (negotiation.alertDataset == pm.currentAlertDataset) {
+                        NegotiationCard(negotiation = negotiation)
+                    }
                 }
 
                 if (stage == 50 && s4.isNotEmpty()) {
@@ -395,9 +471,87 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    
+    @Composable
+    fun GovernanceStatusChip(status: GovernanceStatus, pendingCount: Int) {
+        val (label, color) = when (status) {
+            GovernanceStatus.APPROVED -> "🟢 Approved" to Color(0xFF2E7D32)
+            GovernanceStatus.PENDING -> "🟡 Pending Review" to Color(0xFFF57C00)
+            GovernanceStatus.BLOCKED -> "🔴 Blocked" to Color(0xFFE53935)
+            GovernanceStatus.ESCALATED -> "🟡 Escalated" to Color(0xFFFFA000)
+            GovernanceStatus.MODIFIED -> "🟢 Modified & Approved" to Color(0xFF1976D2)
+        }
+        Surface(
+            color = color.copy(alpha = 0.1f),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(label, color = color, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                if (pendingCount > 0) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Badge { Text("$pendingCount") }
+                    Text(" pending", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+    
+    @Composable
+    fun NegotiationCard(negotiation: AgentNegotiation) {
+        var showDetails by remember { mutableStateOf(false) }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("⚖ Agent Negotiation Active", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = Color(0xFFE65100))
+                Text(negotiation.conflictType, style = MaterialTheme.typography.bodySmall)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("4a: ${negotiation.stage4aPosition.recommendation.take(60)}", style = MaterialTheme.typography.bodySmall)
+                        Text("Confidence: ${(negotiation.stage4aPosition.confidence * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("4b: ${negotiation.stage4bPosition.recommendation.take(60)}", style = MaterialTheme.typography.bodySmall)
+                        Text("Confidence: ${(negotiation.stage4bPosition.confidence * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+                if (showDetails && negotiation.mediatorProposal != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(color = Color(0xFFE8F5E9), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) {
+                        Text(negotiation.mediatorProposal, modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { showDetails = !showDetails }) {
+                        Text(if (showDetails) "Hide Proposal" else "Show Proposal")
+                    }
+                    TextButton(onClick = {
+                        AgentNegotiator.resolveNegotiation(negotiation.negotiationId, acceptMediation = true)
+                        GaaSController.resumePipeline()
+                    }) {
+                        Text("Accept Mediation")
+                    }
+                }
+            }
+        }
+    }
 
     @Composable
-    fun StageBox(title: String, content: String, isActive: Boolean, isComplete: Boolean, fullContent: String? = null) {
+    fun StageBox(
+        title: String,
+        content: String,
+        isActive: Boolean,
+        isComplete: Boolean,
+        fullContent: String? = null,
+        governanceStatus: GovernanceStatus? = null
+    ) {
         var expanded by rememberSaveable { mutableStateOf(false) }
         val displayContent = if (expanded) fullContent ?: content else content
         val canExpand = fullContent != null && fullContent != content
@@ -406,6 +560,8 @@ class MainActivity : ComponentActivity() {
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = when {
+                    governanceStatus == GovernanceStatus.BLOCKED -> Color(0xFFFFEBEE)
+                    governanceStatus == GovernanceStatus.ESCALATED -> Color(0xFFFFF3E0)
                     isActive -> Color(0xFFFFF9C4)
                     isComplete -> Color(0xFFE8F5E9)
                     else -> Color(0xFFF5F5F5)
@@ -413,15 +569,43 @@ class MainActivity : ComponentActivity() {
             )
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = when {
-                        isActive -> Color(0xFFF57C00)
-                        isComplete -> Color(0xFF2E7D32)
-                        else -> Color.Gray
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = when {
+                            governanceStatus == GovernanceStatus.BLOCKED -> Color(0xFFE53935)
+                            governanceStatus == GovernanceStatus.ESCALATED -> Color(0xFFE65100)
+                            isActive -> Color(0xFFF57C00)
+                            isComplete -> Color(0xFF2E7D32)
+                            else -> Color.Gray
+                        }
+                    )
+                    governanceStatus?.let { status ->
+                        val (chipLabel, chipColor) = when (status) {
+                            GovernanceStatus.APPROVED -> "✓" to Color(0xFF2E7D32)
+                            GovernanceStatus.PENDING -> "⏳" to Color(0xFFF57C00)
+                            GovernanceStatus.BLOCKED -> "✕" to Color(0xFFE53935)
+                            GovernanceStatus.ESCALATED -> "⚠" to Color(0xFFE65100)
+                            GovernanceStatus.MODIFIED -> "✎" to Color(0xFF1976D2)
+                        }
+                        Surface(
+                            color = chipColor.copy(alpha = 0.12f),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                chipLabel,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = chipColor
+                            )
+                        }
                     }
-                )
+                }
                 if (displayContent.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
