@@ -304,40 +304,52 @@ private fun MetroMapCanvas(
     }
     val trainY = centerY - 60f
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
-            .drawBehind {
-                // Dot grid background
-                val dotSpacing = 12.dp.toPx()
-                val dotRadius = 1f
-                val dotColor = Color(0xFFE5E7EB).copy(alpha = 0.3f)
-                for (x in 0..(size.width / dotSpacing).toInt() + 1) {
-                    for (y in 0..(size.height / dotSpacing).toInt() + 1) {
-                        drawCircle(
-                            color = dotColor,
-                            radius = dotRadius,
-                            center = Offset(x * dotSpacing, y * dotSpacing)
-                        )
-                    }
-                }
-            }
-            .pointerInput(Unit) {
-                detectTransformGestures { centroid, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(0.6f, 2.5f)
-                    offsetX += pan.x
-                }
-            }
     ) {
+        val containerWidth = constraints.maxWidth.toFloat()
+        val contentWidthPx = with(density) { 1300.dp.toPx() }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .horizontalScroll(rememberScrollState())
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    translationX = offsetX
+                .pointerInput(Unit) {
+                    detectTransformGestures { centroid, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(0.6f, 2.5f)
+                        val scaledContentWidth = contentWidthPx * scale
+                        val minOffset = if (scaledContentWidth > containerWidth)
+                            -(scaledContentWidth - containerWidth) else 0f
+                        offsetX = (offsetX + pan.x).coerceIn(minOffset, 0f)
+                    }
                 }
         ) {
+            Box(
+                modifier = Modifier
+                    .width(1300.dp)
+                    .height(280.dp)
+                    .drawBehind {
+                        // Dot grid background covering full content
+                        val dotSpacing = 12.dp.toPx()
+                        val dotRadius = 1f
+                        val dotColor = Color(0xFFE5E7EB).copy(alpha = 0.3f)
+                        val cols = (size.width / dotSpacing).toInt() + 1
+                        val rows = (size.height / dotSpacing).toInt() + 1
+                        for (x in 0..cols) {
+                            for (y in 0..rows) {
+                                drawCircle(
+                                    color = dotColor,
+                                    radius = dotRadius,
+                                    center = Offset(x * dotSpacing, y * dotSpacing)
+                                )
+                            }
+                        }
+                    }
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offsetX
+                    }
+            ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 // Draw connector lines
                 for (i in 0 until stationDefs.size - 1) {
