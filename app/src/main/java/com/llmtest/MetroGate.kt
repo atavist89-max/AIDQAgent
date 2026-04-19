@@ -49,7 +49,7 @@ fun MetroGate(
     val dashModifier = if (state == GateState.EVALUATING) {
         Modifier.graphicsLayer {
             // For evaluating state we simulate dash animation via alpha pulse
-            alpha = 0.7f + 0.3f * kotlin.math.sin(dashOffset * kotlin.math.PI / 4f)
+            alpha = (0.7f + 0.3f * kotlin.math.sin(dashOffset * kotlin.math.PI / 4f).toFloat())
         }
     } else Modifier
 
