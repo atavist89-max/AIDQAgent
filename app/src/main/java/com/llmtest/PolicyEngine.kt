@@ -20,7 +20,6 @@ object PolicyEngine {
             conditions = emptyList(),
             action = PolicyAction.ESCALATE_TO_HUMAN,
             escalationRequired = true,
-            gateLabel = "TRUST",
             gateOrder = 0
         ),
         PolicyRule(
@@ -32,7 +31,6 @@ object PolicyEngine {
             conditions = emptyList(), // regex evaluated at runtime
             action = PolicyAction.REDACT_AND_LOG,
             escalationRequired = false,
-            gateLabel = "PII",
             gateOrder = 1
         ),
         PolicyRule(
@@ -44,7 +42,6 @@ object PolicyEngine {
             conditions = emptyList(),
             action = PolicyAction.ESCALATE_TO_HUMAN,
             escalationRequired = true,
-            gateLabel = "EXEC",
             gateOrder = 2
         ),
         PolicyRule(
@@ -56,7 +53,6 @@ object PolicyEngine {
             conditions = emptyList(),
             action = PolicyAction.BLOCK_AND_REQUEST_RETRY,
             escalationRequired = false,
-            gateLabel = "AUDIT",
             gateOrder = 3
         ),
         PolicyRule(
@@ -68,7 +64,6 @@ object PolicyEngine {
             conditions = emptyList(),
             action = PolicyAction.BLOCK_AND_REQUEST_RETRY,
             escalationRequired = false,
-            gateLabel = "SCHEMA",
             gateOrder = 4
         )
     )

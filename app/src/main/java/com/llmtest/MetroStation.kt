@@ -3,6 +3,7 @@ package com.llmtest
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -85,7 +86,8 @@ fun MetroStation(
                 .then(if (state == StationState.ACTIVE) Modifier.graphicsLayer {
                     scaleX = pulseScale
                     scaleY = pulseScale
-                } else Modifier),
+                } else Modifier)
+                .clickable { onClick() },
             contentAlignment = Alignment.Center
         ) {
             Icon(

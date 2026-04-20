@@ -201,7 +201,7 @@ Token limit (~2,000) requires chunking. Each stage fits within budget while accu
 | `BugLogger.kt` | Thread-safe file logger. Logs every stage transition, file I/O error, and LLM exception to app-private storage. Accessible via "Logs" button in UI. |
 | `GaaSController.kt` | Central governance orchestrator. Loads policies, coordinates interceptions at stage boundaries, manages pipeline blocking/resume, and handles violation modals. |
 | `TrustScoreManager.kt` | Persists agent trust scores to `trust_scores.json`. Tracks decision accuracy, score history, and autonomy levels. Supports manual overrides with audit logging. |
-| `PolicyEngine.kt` | Evaluates agent outputs against active policies at runtime. Includes 5 default bank policies + dynamic creation with condition builders. Gates are rendered dynamically from policies with `gateLabel` set. |
+| `PolicyEngine.kt` | Evaluates agent outputs against active policies at runtime. Includes 5 default bank policies + dynamic creation with condition builders. Gates are rendered dynamically from policies with `gateOrder >= 0`. |
 | `AgentNegotiator.kt` | Detects conflicts between Stage 4a and 4b outputs. Activates structured negotiation with visual debate interface and hybrid mediation proposals. |
 | `EscalationRouter.kt` | Routes decisions to appropriate channels based on Trust Score + Policy Requirements + Alert Severity. Maintains pending approval queue with priority badges. |
 | `AuditLogger.kt` | Writes immutable append-only decision records to `audit_log.jsonl`. Includes cryptographic integrity (SHA-256), decision path playback, and compliance export. |

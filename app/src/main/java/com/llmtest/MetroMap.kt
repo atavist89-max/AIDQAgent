@@ -291,11 +291,11 @@ private fun MetroMapCanvas(
     val policies = remember { PolicyEngine.getActivePolicies() }
     val gateDefs = remember(policies) {
         policies
-            .filter { it.gateLabel != null }
+            .filter { it.gateOrder >= 0 }
             .sortedBy { it.gateOrder }
             .mapIndexed { index, policy ->
                 GateDef(
-                    label = policy.gateLabel!!,
+                    label = policy.name,
                     x = 220f + index * 200f,
                     afterStation = index,
                     policyId = policy.policyId
