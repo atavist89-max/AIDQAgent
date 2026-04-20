@@ -11,15 +11,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -32,13 +28,12 @@ import kotlinx.serialization.json.Json
 
 class MainActivity : ComponentActivity() {
     private var engine: Engine? = null
-    private var pipelineManager: DQPipelineManager? = null
+    var pipelineManager: DQPipelineManager? = null
+        private set
 
     // UI State
     private val hasPermission = mutableStateOf(false)
     private val isInitialized = mutableStateOf(false)
-    private val currentStage = mutableStateOf(0)
-    private val finalReport = mutableStateOf("")
     private val statusMessage = mutableStateOf("Initializing...")
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -109,7 +104,7 @@ class MainActivity : ComponentActivity() {
             val engineInstance = engine ?: throw IllegalStateException("Engine failed to initialize")
             pipelineManager = DQPipelineManager(engineInstance)
             
-            // Initialize GaaS governance layer
+            // Initialize Fast GaaS governance layer
             GaaSController.initialize()
             
             // Start polling
@@ -306,169 +301,6 @@ class MainActivity : ComponentActivity() {
                     Toast.makeText(this@MainActivity, BugLogger.readLog().take(300), Toast.LENGTH_LONG).show()
                 }) {
                     Text("Logs")
-                }
-            }
-        }
-    }
-    
-    @Composable
-    fun GovernanceStatusChip(status: GovernanceStatus, pendingCount: Int) {
-        val (label, color) = when (status) {
-            GovernanceStatus.APPROVED -> "🟢 Approved" to Color(0xFF2E7D32)
-            GovernanceStatus.PENDING -> "🟡 Pending Review" to Color(0xFFF57C00)
-            GovernanceStatus.BLOCKED -> "🔴 Blocked" to Color(0xFFE53935)
-            GovernanceStatus.ESCALATED -> "🟡 Escalated" to Color(0xFFFFA000)
-            GovernanceStatus.MODIFIED -> "🟢 Modified & Approved" to Color(0xFF1976D2)
-        }
-        Surface(
-            color = color.copy(alpha = 0.1f),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(label, color = color, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                if (pendingCount > 0) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Badge { Text("$pendingCount") }
-                    Text(" pending", style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
-    }
-    
-    @Composable
-    fun NegotiationCard(negotiation: AgentNegotiation) {
-        var showDetails by remember { mutableStateOf(false) }
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text("⚖ Agent Negotiation Active", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = Color(0xFFE65100))
-                Text(negotiation.conflictType, style = MaterialTheme.typography.bodySmall)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("4a: ${negotiation.stage4aPosition.recommendation.take(60)}", style = MaterialTheme.typography.bodySmall)
-                        Text("Confidence: ${(negotiation.stage4aPosition.confidence * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("4b: ${negotiation.stage4bPosition.recommendation.take(60)}", style = MaterialTheme.typography.bodySmall)
-                        Text("Confidence: ${(negotiation.stage4bPosition.confidence * 100).toInt()}%", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-                if (showDetails && negotiation.mediatorProposal != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Surface(color = Color(0xFFE8F5E9), shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) {
-                        Text(negotiation.mediatorProposal, modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { showDetails = !showDetails }) {
-                        Text(if (showDetails) "Hide Proposal" else "Show Proposal")
-                    }
-                    TextButton(onClick = {
-                        AgentNegotiator.resolveNegotiation(negotiation.negotiationId, acceptMediation = true)
-                        GaaSController.resumePipeline()
-                    }) {
-                        Text("Accept Mediation")
-                    }
-                }
-            }
-        }
-    }
-
-    @Composable
-    fun StageBox(
-        title: String,
-        content: String,
-        isActive: Boolean,
-        isComplete: Boolean,
-        fullContent: String? = null,
-        governanceStatus: GovernanceStatus? = null
-    ) {
-        var expanded by rememberSaveable { mutableStateOf(false) }
-        val displayContent = if (expanded) fullContent ?: content else content
-        val canExpand = fullContent != null && fullContent != content
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = when {
-                    governanceStatus == GovernanceStatus.BLOCKED -> Color(0xFFFFEBEE)
-                    governanceStatus == GovernanceStatus.ESCALATED -> Color(0xFFFFF3E0)
-                    isActive -> Color(0xFFFFF9C4)
-                    isComplete -> Color(0xFFE8F5E9)
-                    else -> Color(0xFFF5F5F5)
-                }
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = when {
-                            governanceStatus == GovernanceStatus.BLOCKED -> Color(0xFFE53935)
-                            governanceStatus == GovernanceStatus.ESCALATED -> Color(0xFFE65100)
-                            isActive -> Color(0xFFF57C00)
-                            isComplete -> Color(0xFF2E7D32)
-                            else -> Color.Gray
-                        }
-                    )
-                    governanceStatus?.let { status ->
-                        val (chipLabel, chipColor) = when (status) {
-                            GovernanceStatus.APPROVED -> "✓" to Color(0xFF2E7D32)
-                            GovernanceStatus.PENDING -> "⏳" to Color(0xFFF57C00)
-                            GovernanceStatus.BLOCKED -> "✕" to Color(0xFFE53935)
-                            GovernanceStatus.ESCALATED -> "⚠" to Color(0xFFE65100)
-                            GovernanceStatus.MODIFIED -> "✎" to Color(0xFF1976D2)
-                        }
-                        Surface(
-                            color = chipColor.copy(alpha = 0.12f),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                chipLabel,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = chipColor
-                            )
-                        }
-                    }
-                }
-                if (displayContent.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        displayContent,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = if (expanded || (isComplete && title.contains("Synthesis"))) Int.MAX_VALUE else 4,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (canExpand) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        TextButton(
-                            onClick = { expanded = !expanded },
-                            contentPadding = PaddingValues(0.dp),
-                            modifier = Modifier.height(24.dp)
-                        ) {
-                            Text(
-                                if (expanded) "Collapse" else "Expand",
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                    }
-                } else if (isActive) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
                 }
             }
         }

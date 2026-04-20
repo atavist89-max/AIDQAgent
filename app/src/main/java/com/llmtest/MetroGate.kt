@@ -19,40 +19,44 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-enum class GateState {
-    EVALUATING, APPROVED, BLOCKED, ESCALATED
-}
-
 @Composable
 fun MetroGate(
     label: String,
-    state: GateState,
+    state: GateVisualState,
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val borderColor = when (state) {
-        GateState.EVALUATING -> Color(0xFFFFAB00)
-        GateState.APPROVED -> Color(0xFF00BFA5)
-        GateState.BLOCKED -> Color(0xFFD50000)
-        GateState.ESCALATED -> Color(0xFF7C4DFF)
+        GateVisualState.INACTIVE -> Color(0xFF9CA3AF)
+        GateVisualState.ACTIVE -> Color(0xFF2196F3)
+        GateVisualState.REVIEWING -> Color(0xFFFFAB00)
+        GateVisualState.REJECTED -> Color(0xFFD50000)
+        GateVisualState.APPROVED -> Color(0xFF00BFA5)
+        GateVisualState.OVERRIDDEN -> Color(0xFFFF6D00)
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "gateDash")
-    val dashOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 8f,
+    val bgColor = when (state) {
+        GateVisualState.INACTIVE -> Color.Transparent
+        GateVisualState.ACTIVE -> Color(0xFFE3F2FD)
+        GateVisualState.REVIEWING -> Color(0xFFFFF8E1)
+        GateVisualState.REJECTED -> Color(0xFFFFEBEE)
+        GateVisualState.APPROVED -> Color(0xFFE0F2F1)
+        GateVisualState.OVERRIDDEN -> Color(0xFFFFF3E0)
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "gatePulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = if (state == GateVisualState.REJECTED) 1f else 0.6f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            animation = tween(600, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
         ),
-        label = "dash"
+        label = "pulse"
     )
 
-    val dashModifier = if (state == GateState.EVALUATING) {
-        Modifier.graphicsLayer {
-            // For evaluating state we simulate dash animation via alpha pulse
-            alpha = (0.7f + 0.3f * kotlin.math.sin(dashOffset * kotlin.math.PI / 4f).toFloat())
-        }
+    val alphaModifier = if (state == GateVisualState.REJECTED) {
+        Modifier.graphicsLayer { alpha = pulseAlpha }
     } else Modifier
 
     Column(
@@ -63,31 +67,26 @@ fun MetroGate(
             modifier = Modifier
                 .size(52.dp)
                 .rotate(45f)
-                .background(
-                    color = when (state) {
-                        GateState.EVALUATING -> Color(0xFFFFF8E1)
-                        GateState.APPROVED -> Color(0xFFE0F2F1)
-                        GateState.BLOCKED -> Color(0xFFFFEBEE)
-                        GateState.ESCALATED -> Color(0xFFF3E5F5)
-                    }
-                )
+                .background(bgColor)
                 .border(
-                    width = 3.dp,
+                    width = if (state == GateVisualState.INACTIVE) 2.dp else 3.dp,
                     color = borderColor,
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
                 )
-                .then(dashModifier)
+                .then(alphaModifier)
                 .clickable { onClick() },
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Shield,
-                contentDescription = null,
-                tint = borderColor,
-                modifier = Modifier
-                    .size(24.dp)
-                    .rotate(-45f)
-            )
+            if (state != GateVisualState.INACTIVE) {
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = borderColor,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .rotate(-45f)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(10.dp))

@@ -5,7 +5,6 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -16,14 +15,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
 fun AgentThoughtPanel(
     thought: AgentThought?,
-    negotiation: AgentNegotiation?,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
     modifier: Modifier = Modifier
@@ -60,20 +63,18 @@ fun AgentThoughtPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (negotiation != null) "Agent Negotiation" else "Agent Reasoning",
+                    text = "Agent Reasoning",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color(0xFF1A1A2E)
                 )
 
                 val statusColor = when {
-                    negotiation != null -> Color(0xFF7C4DFF)
                     thought?.isTyping == true -> Color(0xFFFFAB00)
                     thought != null -> Color(0xFF00BFA5)
                     else -> Color(0xFF6B7280)
                 }
                 val statusText = when {
-                    negotiation != null -> "MEDIATING"
                     thought?.isTyping == true -> "THINKING..."
                     thought != null -> "COMPLETE"
                     else -> "WAITING"
@@ -104,18 +105,10 @@ fun AgentThoughtPanel(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Content
-            AnimatedContent(
-                targetState = negotiation != null,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "panel"
-            ) { showNegotiation ->
-                if (showNegotiation && negotiation != null) {
-                    NegotiationView(negotiation = negotiation)
-                } else if (thought != null) {
-                    SingleAgentView(thought = thought, isExpanded = isExpanded)
-                } else {
-                    EmptyThoughtView()
-                }
+            if (thought != null) {
+                SingleAgentView(thought = thought, isExpanded = isExpanded)
+            } else {
+                EmptyThoughtView()
             }
         }
     }
@@ -123,14 +116,6 @@ fun AgentThoughtPanel(
 
 @Composable
 private fun SingleAgentView(thought: AgentThought, isExpanded: Boolean) {
-    val level = AutonomyLevel.fromScore(thought.trustScore)
-    val levelColor = when (level) {
-        AutonomyLevel.TRAINING -> Color(0xFFD50000)
-        AutonomyLevel.SUPERVISED -> Color(0xFFFF6D00)
-        AutonomyLevel.AUTONOMOUS -> Color(0xFF00BFA5)
-        AutonomyLevel.EXPERT -> Color(0xFF7C4DFF)
-    }
-
     Column {
         // Agent header card
         Surface(
@@ -159,9 +144,9 @@ private fun SingleAgentView(thought: AgentThought, isExpanded: Boolean) {
                             color = Color(0xFF1A1A2E)
                         )
                         Text(
-                            text = "Trust: ${thought.trustScore} pts • ${level.label.uppercase()}",
+                            text = thought.agentRole,
                             fontSize = 11.sp,
-                            color = levelColor,
+                            color = Color(0xFF6B7280),
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -169,7 +154,7 @@ private fun SingleAgentView(thought: AgentThought, isExpanded: Boolean) {
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Speech bubble
+                // Speech bubble with formatted text
                 Surface(
                     color = Color(0xFFE8EAF6),
                     shape = RoundedCornerShape(12.dp)
@@ -181,7 +166,7 @@ private fun SingleAgentView(thought: AgentThought, isExpanded: Boolean) {
                         )
                     } else {
                         Text(
-                            text = thought.reasoning,
+                            text = parseMarkdownToAnnotatedString(thought.reasoning),
                             fontSize = 13.sp,
                             color = Color(0xFF1A1A2E),
                             lineHeight = 18.sp,
@@ -253,177 +238,6 @@ private fun SingleAgentView(thought: AgentThought, isExpanded: Boolean) {
 }
 
 @Composable
-private fun NegotiationView(negotiation: AgentNegotiation) {
-    Column {
-        // VS Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.Top
-        ) {
-            // Stage 4a card
-            NegotiationAgentCard(
-                agentName = negotiation.stage4aPosition.agentName,
-                recommendation = negotiation.stage4aPosition.recommendation,
-                priority = negotiation.stage4aPosition.priority,
-                confidence = negotiation.stage4aPosition.confidence,
-                trustScore = TrustScoreManager.getScore("stage4a")?.score ?: 50,
-                borderColor = Color(0xFF1A237E)
-            )
-
-            // VS badge
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFFFAB00)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "VS",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-
-            // Stage 4b card
-            NegotiationAgentCard(
-                agentName = negotiation.stage4bPosition.agentName,
-                recommendation = negotiation.stage4bPosition.recommendation,
-                priority = negotiation.stage4bPosition.priority,
-                confidence = negotiation.stage4bPosition.confidence,
-                trustScore = TrustScoreManager.getScore("stage4b")?.score ?: 50,
-                borderColor = Color(0xFF00BFA5)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Mediator card
-        AnimatedVisibility(visible = negotiation.mediatorProposal != null) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFFF3E5F5),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(4.dp, Color(0xFF7C4DFF))
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.CompareArrows,
-                            contentDescription = null,
-                            tint = Color(0xFF7C4DFF),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "GaaS Mediator",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF7C4DFF)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = negotiation.mediatorProposal ?: "",
-                        fontSize = 12.sp,
-                        color = Color(0xFF1A1A2E),
-                        lineHeight = 16.sp
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Action buttons
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = {
-                    AgentNegotiator.resolveNegotiation(negotiation.negotiationId, acceptMediation = true)
-                    GaaSController.resumePipeline()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00BFA5)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Accept", fontSize = 13.sp)
-            }
-            OutlinedButton(
-                onClick = { /* debate */ },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFAB00)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Debate", fontSize = 13.sp)
-            }
-            OutlinedButton(
-                onClick = { /* override */ },
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1A237E)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Override", fontSize = 13.sp)
-            }
-        }
-    }
-}
-
-@Composable
-private fun NegotiationAgentCard(
-    agentName: String,
-    recommendation: String,
-    priority: String,
-    confidence: Float,
-    trustScore: Int,
-    borderColor: Color,
-    modifier: Modifier = Modifier
-) {
-    val borderWidth = (confidence * 5).coerceIn(1f, 4f).dp
-
-    Surface(
-        modifier = modifier.width(140.dp),
-        color = Color.White,
-        shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(borderWidth, borderColor)
-    ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            Text(
-                text = agentName,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = borderColor
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = recommendation,
-                fontSize = 11.sp,
-                color = Color(0xFF1A1A2E),
-                maxLines = 3,
-                lineHeight = 14.sp
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "Priority: $priority",
-                fontSize = 10.sp,
-                color = Color(0xFF6B7280)
-            )
-            Text(
-                text = "Confidence: ${(confidence * 100).toInt()}%",
-                fontSize = 10.sp,
-                color = Color(0xFF6B7280)
-            )
-            Text(
-                text = "Trust: $trustScore",
-                fontSize = 10.sp,
-                color = Color(0xFF6B7280)
-            )
-        }
-    }
-}
-
-@Composable
 private fun EmptyThoughtView() {
     Box(
         modifier = Modifier
@@ -452,10 +266,73 @@ private fun TypingText(text: String, modifier: Modifier = Modifier) {
     }
 
     Text(
-        text = displayedText,
+        text = parseMarkdownToAnnotatedString(displayedText),
         fontSize = 13.sp,
         color = Color(0xFF1A1A2E),
         lineHeight = 18.sp,
         modifier = modifier
     )
+}
+
+/**
+ * Parse simple Markdown-style emphasis (**bold**, *italic*) into an AnnotatedString.
+ * Also converts lines starting with "- " or "* " into bullet points.
+ */
+fun parseMarkdownToAnnotatedString(input: String): AnnotatedString {
+    return buildAnnotatedString {
+        val lines = input.lines()
+        lines.forEachIndexed { lineIndex, rawLine ->
+            val line = rawLine.trim()
+            if (lineIndex > 0) append("\n")
+
+            // Bullet detection
+            val isBullet = line.startsWith("- ") || line.startsWith("* ")
+            val content = if (isBullet) line.removePrefix("- ").removePrefix("* ") else line
+
+            if (isBullet) {
+                append("\u2022 ")
+            }
+
+            // Parse inline formatting
+            parseInlineMarkdown(content)
+        }
+    }
+}
+
+private fun androidx.compose.ui.text.AnnotatedString.Builder.parseInlineMarkdown(text: String) {
+    var i = 0
+    while (i < text.length) {
+        when {
+            // Bold: **text**
+            i + 1 < text.length && text[i] == '*' && text[i + 1] == '*' -> {
+                val end = text.indexOf("**", i + 2)
+                if (end != -1) {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append(text.substring(i + 2, end))
+                    }
+                    i = end + 2
+                } else {
+                    append(text[i])
+                    i++
+                }
+            }
+            // Italic: *text* (but not ** which was handled above)
+            text[i] == '*' -> {
+                val end = text.indexOf('*', i + 1)
+                if (end != -1) {
+                    withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
+                        append(text.substring(i + 1, end))
+                    }
+                    i = end + 1
+                } else {
+                    append(text[i])
+                    i++
+                }
+            }
+            else -> {
+                append(text[i])
+                i++
+            }
+        }
+    }
 }

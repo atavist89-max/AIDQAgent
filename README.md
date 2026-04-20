@@ -5,38 +5,19 @@
 
 ---
 
-## 🆕 GaaS Branch: Governance-as-a-Service
+## 🆕 Fast GaaS Branch: Lightweight Governance-as-a-Service
 
-This is the **`gaas-enhancement`** branch. It transforms DQ Agent from a reactive analysis tool into an **AI ecosystem that is itself governed**.
+This is the **`gaas-fast`** branch. It streamlines the GaaS layer into a fast, configurable policy prompt manager with automatic retry and human arbitration.
 
-### What's Different from Main?
+### What's Different from GaaS Enhancement?
 
-| | **Main Branch** | **GaaS Branch** |
+| | **GaaS Enhancement** | **Fast GaaS** |
 |---|---|---|
-| **Question answered** | "What broke?" | "Is our AI workforce making good decisions, and are they following bank policies?" |
-| **User role** | Alert consumer | AI workforce manager |
-| **Key feature** | 4-stage pipeline | Trust scores + policy engine + agent negotiation + audit forensics + Metro Map visualization |
-| **APK name** | DQ Agent | **DQ Agent - GaaS** |
-| **Installs alongside?** | — | ✅ Yes (`.gaas` applicationId suffix) |
-
-### The "Wow Factor": Who Watches the AI Watchers?
-
-The GaaS layer sits between the Stage 4 analysis agents and the final output, adding a meta-layer of AI governance:
-
-- **Trust Score Management** — Each AI agent (Stage 1-4) has a persistent Trust Score (0-100). Scores evolve based on decision accuracy. Autonomy levels auto-adjust from "Training Wheels" to "Full Delegation."
-- **Policy Engine with Dynamic Creation** — 5 pre-loaded bank policies (PII Prevention, Executive Contact Approval, Critical Alert Oversight, Audit Trail Completeness, Schema Drift Validation). The Data Quality Coordinator can create new policies in-app without restarting. Policies can be assigned to Metro Map gates so tooltips stay in sync automatically.
-- **Agent Negotiation Mediator** — When Stage 4a (Technical) and 4b (Business) agents disagree, a structured "debate" interface activates with mediation proposals.
-- **Escalation Router** — Four-level smart escalation: Auto-Resolve → Notify & Log → Request Approval → Emergency Human-in-Loop.
-- **Audit & Forensics** — Immutable append-only decision trail with SHA-256 integrity. Playback any decision path. Export for regulatory compliance.
-
-### Governance Cockpit (New Tab)
-
-A third **"Governance"** tab joins Create and Analyze in the bottom navigation:
-
-- **Trust Dashboard** — Card-based agent overview with Trust Score progress bars, trend arrows (↗ → ↘), and autonomy badges
-- **Policy Center** — Toggle policies on/off, create new policies with visual condition builder
-- **Decision Queue** — Swipeable approval cards with priority badges. Batch approve low-risk items.
-- **Audit Playback** — Timeline visualization, search/filter by date/agent/policy, compliance export
+| **Governance model** | Trust scores, agent autonomy, negotiation, escalation levels, audit trails | Simple user-written policy prompts per gate |
+| **Human intervention** | First-class queue system with approval/rejection | Final arbitration after 3 automatic retries |
+| **Governance tab** | 5 sub-screens (Dashboard, Agent Detail, Policy Editor, Decision Queue, Audit Playback) | Single scrollable configuration screen |
+| **Policy engine** | Hardcoded regex rules + visual condition builder | Free-text policy prompts editable per gate |
+| **State files** | 8+ files including trust scores, policy rules, audit logs | Essential pipeline outputs + 2 config files |
 
 ---
 
@@ -56,7 +37,7 @@ It fails at **contextual reasoning**:
 
 ---
 
-## The Solution: 4-Stage Reasoning Pipeline
+## The Solution: 6-Stage Reasoning Pipeline with Fast GaaS
 
 DQ Agent transforms raw DQ alerts into **executive intelligence** through a constraint-engineered pipeline designed for on-device LLM limits (~2,000 tokens).
 
@@ -72,6 +53,37 @@ DQ Agent transforms raw DQ alerts into **executive intelligence** through a cons
 | **4c. Synthesizer** | Executive narrative synthesizing both research reports | ~1,900 | Stewardship report (350-400 words) |
 
 **Constraint Management:** 10-second thermal cooldown between stages prevents GPU throttling on mobile hardware.
+
+### Fast GaaS Gate System
+
+Between each stage is a configurable governance gate:
+
+| Gate | Between Stages | Default Policy Prompt |
+|------|---------------|----------------------|
+| **Gate 1** | Stage 1 → Stage 2 | Ensure triage decision is consistent with severity and downstream impact |
+| **Gate 2** | Stage 2 → Stage 3 | Verify entity metadata and catalog columns are correctly matched |
+| **Gate 3** | Stage 3 → Stage 4A | Confirm pattern detection considers owner workload and group health |
+| **Gate 4** | Stage 4A → Stage 4B | Validate upstream analysis uses actual system names and specific root-cause hypotheses |
+| **Gate 5** | Stage 4B → Stage 4C | Validate downstream impact assessment prioritizes Class 2 reports and identifies stakeholders |
+
+**Auto-Retry Loop:**
+1. Stage completes and writes output JSON
+2. If gate policy is enabled, the GaaS agent reviews the output using the fixed system prompt + user-defined policy prompt
+3. If **APPROVED**, the gate turns green and the pipeline proceeds
+4. If **REJECTED**, the gate turns red and the pipeline auto-retries:
+   - **LLM stages (4A, 4B, 4C):** Re-run with GaaS feedback bullets injected into the prompt
+   - **Deterministic stages (1, 2, 3):** Send the same cached output back for re-review
+5. After **3 rejections**, human intervention is required with exactly two options:
+   - **Accept Station Version** — override the gate (orange) and proceed with the agent's output
+   - **Accept GaaS Assessment** — treat rejection as final and abandon the pipeline for this alert
+
+**Gate Visual States:**
+- 🔘 Gray hollow diamond — no policy configured
+- 🔵 Blue — policy enabled, awaiting train
+- 🟡 Yellow dashed — GaaS agent reviewing
+- 🔴 Red pulsing — rejected
+- 🟢 Green — approved
+- 🟠 Orange — human overridden
 
 ### What This Enables
 
@@ -108,13 +120,19 @@ DQ Agent transforms raw DQ alerts into **executive intelligence** through a cons
 │   ├── entity_groups.json     # 8 functional groups with ownership
 │   ├── catalog_columns.json   # 50+ column-level technical metadata
 │   ├── reports.json           # 15 downstream report definitions
-│   ├── dq_knowledge.json      # Severity rules, dimension definitions, KPI thresholds
-│   ├── trust_scores.json      # 🆕 Agent trust profiles and score history
-│   └── policy_rules.json      # 🆕 Active governance policies with conditions
-├── state/                     # Runtime pipeline state (Stage 1→4 JSON files)
-│   ├── gaas_state.json        # 🆕 Runtime governance state
-│   └── audit_log.jsonl        # 🆕 Append-only immutable decision trail
-└── demo_input/              # File drop trigger for new alerts
+│   └── dq_knowledge.json      # Severity rules, dimension definitions, KPI thresholds
+├── state/                     # Runtime pipeline state
+│   ├── stage1.json            # Triage output
+│   ├── stage2.json            # Context builder output
+│   ├── stage3.json            # Pattern detector output
+│   ├── stage4a.json           # Upstream researcher output
+│   ├── stage4b.json           # Downstream researcher output
+│   ├── stage4c.json           # Synthesizer output
+│   ├── gaas_policies.json     # 5 gate policies (enabled + prompt per gate)
+│   ├── station_prompts.json   # 6 station agent prompts
+│   └── gaas_block.json        # Transient block state during retry loops
+└── demo_input/                # File drop trigger for new alerts
+    └── new_alert.json
 ```
 
 ### Key Engineering Decisions
@@ -143,42 +161,34 @@ Token limit (~2,000) requires chunking. Each stage fits within budget while accu
 ├── app/src/main/AndroidManifest.xml# App manifest: MANAGE_EXTERNAL_STORAGE + native libs
 ├── app/src/main/java/com/llmtest/
 │   ├── MainActivity.kt             # Entry point: BottomNav (Create/Analyze/Governance), engine init, file polling
-│   ├── CreatorScreen.kt            # 3-tier cascading dropdown alert builder with auto-fill from JSON
+│   ├── CreatorScreen.kt            # 4-tier cascading dropdown alert builder with auto-fill from JSON
 │   ├── GhostPaths.kt               # Centralized hard-coded paths to model, data, state, input
 │   ├── DQDataClasses.kt            # @Serializable data models: Alert, Entity, Report, Catalog, AnalysisState
-│   ├── DQPipelineManager.kt        # Orchestrates Stage 1→4a→4b→4c with 10s thermal cooldowns + GaaS hooks
+│   ├── GaaSDataClasses.kt          # Fast GaaS data models: GaaSPolicy, StationPrompt, GaaSBlockState, GateVisualState
+│   ├── GovernanceConfig.kt         # Reads/writes gaas_policies.json and station_prompts.json with defaults
+│   ├── GaaSController.kt           # Fast GaaS orchestrator: gate review, retry loop, human intervention state
+│   ├── DQPipelineManager.kt        # Orchestrates Stage 1→4a→4b→4c with 10s thermal cooldowns + GaaS gate reviews
 │   ├── Stage1Triage.kt             # Severity + downstream report impact → FULL_ANALYSIS or MINIMAL
 │   ├── Stage2ContextBuilder.kt     # Entity lookup, column defs, source system → condensed context string
 │   ├── Stage3PatternDetector.kt    # Owner workload correlation, group health → pattern detection
 │   ├── Stage4UpstreamResearcher.kt # Technical Data Architect: root cause hypothesis + investigation path
 │   ├── Stage4DownstreamResearcher.kt# Business Impact Analyst: cascade + stakeholder notification priority
 │   ├── Stage4Synthesizer.kt        # Senior Data Steward: executive narrative for CDO briefing
+│   ├── Stage4Synthesis.kt          # Legacy monolithic synthesis (retained for reference)
 │   ├── BugLogger.kt                # File-based timestamped logger (logs/bug_log.txt)
-│   ├── GaaSDataClasses.kt          # 🆕 Governance data models: TrustScore, PolicyRule, AuditRecord, etc.
-│   ├── GaaSController.kt           # 🆕 Central governance orchestrator with pre/post stage hooks
-│   ├── TrustScoreManager.kt        # 🆕 Persistent trust scores, autonomy levels, manual overrides
-│   ├── PolicyEngine.kt             # 🆕 5 default policies + dynamic creation/evaluation + gate rendering
-│   ├── AgentNegotiator.kt          # 🆕 Conflict detection, structured debate, mediation proposals
-│   ├── EscalationRouter.kt         # 🆕 4-level smart escalation with priority matrix
-│   ├── AuditLogger.kt              # 🆕 Immutable append-only audit trail with SHA-256 hashing
-│   ├── GovernanceScreen.kt         # 🆕 Navigation host for Governance tab
-│   ├── GovernanceDashboard.kt      # 🆕 Trust dashboard with agent cards and stats overview
-│   ├── AgentDetail.kt              # 🆕 Deep-dive into single agent performance history
-│   ├── PolicyEditor.kt             # 🆕 Visual policy creation and management (includes gate label assignment)
-│   ├── DecisionQueue.kt            # 🆕 Pending approvals interface with priority badges
-│   ├── AuditPlayback.kt            # 🆕 Timeline replay and compliance export
-│   ├── MetroMap.kt                 # 🆕 Interactive pipeline visualization: stations, gates, train, pan/zoom, tooltips
-│   ├── MetroStation.kt             # 🆕 Stage station composable with trust score pill
-│   ├── MetroGate.kt                # 🆕 Governance gate composable (shield diamond)
-│   ├── MetroTrain.kt               # 🆕 Moving alert card showing current analysis progress
-│   ├── MetroMapViewModel.kt        # 🆕 Animation state for train position and policy results
-│   ├── AgentThoughtPanel.kt        # 🆕 Expandable reasoning panel for active agent
-│   ├── PolicyEvaluationPanel.kt    # 🆕 Live policy violation display
-│   └── TrustThermometer.kt         # 🆕 Visual trust score indicator
+│   ├── GovernanceScreen.kt         # Single-scroll Governance tab: system prompt, 5 policy cards, 6 station editors
+│   ├── HumanInterventionScreen.kt  # Full-screen arbitration UI after 3 failed auto-retries
+│   ├── MetroMap.kt                 # Interactive pipeline visualization: stations, gates, train, pan/zoom, tooltips
+│   ├── MetroStation.kt             # Stage station composable (no trust score pill)
+│   ├── MetroGate.kt                # Governance gate composable with 6 visual states
+│   ├── MetroTrain.kt               # Moving alert card with "Waiting at Gate" message when blocked
+│   ├── MetroMapViewModel.kt        # Animation state for train position and agent thoughts
+│   ├── AgentThoughtPanel.kt        # Expandable reasoning panel with markdown-formatted text
+│   └── PolicyEvaluationPanel.kt    # Policy result display cards
 ├── build.gradle                    # Root project plugins (Android, Kotlin, Compose, Serialization)
 ├── settings.gradle                 # Project name + repository config (Google, Maven Central)
 ├── gradle.properties               # AndroidX, compile SDK override, JVM heap settings
-├── gradle/wrapper/gradle-wrapper.properties  # Gradle 9.1.0 (Java 25 compatible)
+├── gradle/wrapper/gradle-wrapper.properties  # Gradle version
 ├── demo_alert.json                 # Golden demo alert (LINK_ORDER_CUSTOMER, Critical, Adaptability)
 └── README.md                       # This file
 ```
@@ -187,24 +197,28 @@ Token limit (~2,000) requires chunking. Each stage fits within budget while accu
 
 | File | Responsibility |
 |------|----------------|
-| `MainActivity.kt` | Entry point with BottomNavigationBar (Create + Analyze + **Governance** tabs). Initializes LiteRT-LM engine, GaaS layer, and starts 5-second file poll loop. |
-| `CreatorScreen.kt` | 3-tier cascading dropdown form (Type → Source → Dataset). Auto-fills check name, severity, dimension, and owner email from JSON lookups. Writes alert JSON to `demo_input/new_alert.json`. |
-| `GhostPaths.kt` | Single source of truth for all absolute file paths on device. Validates model availability (`>1GB`) and DQ data directory presence. Includes paths for GaaS governance files. |
+| `MainActivity.kt` | Entry point with BottomNavigationBar (Create + Analyze + Governance tabs). Initializes LiteRT-LM engine, GaaS layer, and starts 5-second file poll loop. |
+| `CreatorScreen.kt` | 4-tier cascading dropdown form (Type → Source → Dataset → Check). Auto-fills check name, severity, dimension, and owner email from JSON lookups. Writes alert JSON to `demo_input/new_alert.json`. |
+| `GhostPaths.kt` | Single source of truth for all absolute file paths on device. Validates model availability (`>1GB`) and DQ data directory presence. |
 | `DQDataClasses.kt` | Kotlinx Serialization data classes consumed by all stages. `AnalysisState` is the accumulator passed from Stage 1→4c. |
-| `DQPipelineManager.kt` | CoroutineScope-driven orchestrator. Handles stage progression through 1→2→3→4a→4b→4c with 10s `delay()` cooldowns. Early-exit for `MINIMAL` alerts. **GaaS hooks** wrap each stage boundary for policy validation. |
+| `GaaSDataClasses.kt` | Fast GaaS data models: policies, station prompts, block state, gate visual states, review results. |
+| `GovernanceConfig.kt` | Manages `gaas_policies.json` and `station_prompts.json`. Creates sensible defaults on first launch. |
+| `GaaSController.kt` | Fast GaaS orchestrator. Checks gap policies, builds review prompts, parses LLM responses, manages gate visual states, handles human intervention resolution. |
+| `DQPipelineManager.kt` | CoroutineScope-driven orchestrator. Handles stage progression through 1→2→3→4a→4b→4c with 10s `delay()` cooldowns. After each stage, triggers GaaS gate review with up to 3 auto-retries before human intervention. |
 | `Stage1Triage.kt` | Loads `reports.json`, checks if the alert dataset feeds any executive (`Class 2`) reports. Decides `FULL_ANALYSIS` vs `MINIMAL`. Writes `stage1.json`. |
 | `Stage2ContextBuilder.kt` | Loads `entities.json`, `catalog_columns.json`, `entity_groups.json`. Builds a condensed business context string (<1,200 tokens). Writes `stage2.json`. |
-| `Stage3PatternDetector.kt` | Loads `dq_alerts.json` to count owner failures and compute entity group health score by functional group (not datasource). Detects `owner_overload`, `group_collapse`, or `isolated_incident`. Writes `stage3.json`. |
-| `Stage4UpstreamResearcher.kt` | Technical Data Architect sub-agent. Analyzes source system architecture, builds root cause hypothesis with confidence, and defines investigation path. Writes `stage4a.json`. |
-| `Stage4DownstreamResearcher.kt` | Business Impact Analyst sub-agent. Assesses cascade chains, stakeholder notification priority by report class, and time sensitivity. Writes `stage4b.json`. |
-| `Stage4Synthesizer.kt` | Senior Data Steward sub-agent. Synthesizes upstream + downstream research into a 350-400 word executive narrative for CDO briefing. Writes `stage4c.json`. |
+| `Stage3PatternDetector.kt` | Loads `dq_alerts.json` to count owner failures and compute entity group health score by functional group. Detects `owner_overload`, `group_collapse`, or `isolated_incident`. Writes `stage3.json`. |
+| `Stage4UpstreamResearcher.kt` | Technical Data Architect sub-agent. Reads editable prompt from `station_prompts.json`. Analyzes source system architecture, builds root cause hypothesis. Writes `stage4a.json`. |
+| `Stage4DownstreamResearcher.kt` | Business Impact Analyst sub-agent. Reads editable prompt from `station_prompts.json`. Assesses cascade chains, stakeholder priority. Writes `stage4b.json`. |
+| `Stage4Synthesizer.kt` | Senior Data Steward sub-agent. Reads editable prompt from `station_prompts.json`. Synthesizes upstream + downstream research into executive narrative. Writes `stage4c.json`. |
 | `BugLogger.kt` | Thread-safe file logger. Logs every stage transition, file I/O error, and LLM exception to app-private storage. Accessible via "Logs" button in UI. |
-| `GaaSController.kt` | Central governance orchestrator. Loads policies, coordinates interceptions at stage boundaries, manages pipeline blocking/resume, and handles violation modals. |
-| `TrustScoreManager.kt` | Persists agent trust scores to `trust_scores.json`. Tracks decision accuracy, score history, and autonomy levels. Supports manual overrides with audit logging. |
-| `PolicyEngine.kt` | Evaluates agent outputs against active policies at runtime. Includes 5 default bank policies + dynamic creation with condition builders. Gates are rendered dynamically from policies with `gateOrder >= 0`. |
-| `AgentNegotiator.kt` | Detects conflicts between Stage 4a and 4b outputs. Activates structured negotiation with visual debate interface and hybrid mediation proposals. |
-| `EscalationRouter.kt` | Routes decisions to appropriate channels based on Trust Score + Policy Requirements + Alert Severity. Maintains pending approval queue with priority badges. |
-| `AuditLogger.kt` | Writes immutable append-only decision records to `audit_log.jsonl`. Includes cryptographic integrity (SHA-256), decision path playback, and compliance export. |
+| `GovernanceScreen.kt` | Single-scroll Governance configuration tab. Section A: fixed system prompt card. Section B: 5 policy cards with toggle + prompt field. Section C: 6 station-agent editor cards. |
+| `HumanInterventionScreen.kt` | Arbitration UI shown after 3 failed GaaS retries. Displays station output, GaaS feedback, attempt history, and two buttons: Accept Station Version or Accept GaaS Assessment. |
+| `MetroMap.kt` | Interactive canvas-based pipeline visualization. 6 stations, 5 gates, animated train, pan/zoom, formatted tooltips. Shows human intervention screen overlay when required. |
+| `MetroStation.kt` | Circular station composable with icon, label, and agent name. Pulsing animation when active. |
+| `MetroGate.kt` | Diamond-shaped gate composable supporting 6 visual states (inactive, active, reviewing, rejected, approved, overridden). |
+| `MetroTrain.kt` | Alert card that moves along the pipeline. Shows dataset, severity, dimension, elapsed time, progress, and "Waiting at Gate" message when blocked. |
+| `AgentThoughtPanel.kt` | Expandable bottom panel showing the active agent's reasoning with proper markdown formatting (bold, italic, bullets). |
 
 ---
 
@@ -235,16 +249,22 @@ The system consumes 5 integrated data sources:
 3. **Open the App:** Tap "Create" tab in the Bottom Navigation Bar
 4. **Build the Alert:** Select `postgres` → `beta_hub` → `LINK_ORDER_CUSTOMER` → choose from 5–7 check names. Watch auto-fill populate severity, dimension, and owner email.
 5. **Send:** Tap "Send DQ Alert" → Toast confirms delivery
-6. **Switch to Analyze:** Tap "Analyze" tab. Watch the **Metro Map visualization** — a train moves through 6 stations (Stage 1→4c) with 5 governance gates (TRUST, PII, EXEC, AUDIT, SCHEMA) between them. Tap any station or gate for a tooltip explaining what that step does. The train pauses and pulses when a policy violation blocks the pipeline.
+6. **Switch to Analyze:** Tap "Analyze" tab. Watch the **Metro Map visualization** — a train moves through 6 stations (Stage 1→4c) with 5 governance gates between them. Tap any station or gate for a tooltip explaining what that step does. The train pauses and pulses when a gate rejects output.
 7. **The Reveal:** Executive Stewardship Report appears with technical briefing, impact assessment, and actionable recommendations
 
-### Governance Cockpit Demo (GaaS Branch Exclusive)
+### Governance Configuration Demo
 
-1. **Trust Dashboard:** Tap **Governance** tab. See all 7 agents with Trust Score rings, trend arrows, and autonomy badges (Training → Supervised → Autonomous → Expert).
-2. **Policy Violation:** Trigger a Critical alert. Watch the Analyze tab show a 🔴 Blocked chip and a **Policy Violation modal** explaining why. Tap "Approve & Continue" to override.
-3. **Agent Negotiation:** Create an alert that triggers conflicting 4a/4b recommendations. See the **⚖ Agent Negotiation Active** card with each agent's position, confidence, and evidence. Tap "Accept Mediation" or examine the hybrid proposal.
-4. **Decision Queue:** If escalation fires, open Governance → tap **Queue**. See swipeable approval cards with priority badges. Approve or reject with notes.
-5. **Audit Playback:** In Governance, tap **Audit**. Search by agent, policy, or date. Tap **Export** to generate compliance documentation.
+1. **Open Governance:** Tap the **Governance** tab. See the fixed system prompt card at the top (collapsible).
+2. **Enable a Gate:** Toggle "Enable Gate" on Gate 1. Enter a custom policy prompt like "Ensure severity is Critical before allowing FULL_ANALYSIS."
+3. **Edit Station Prompts:** Scroll to Stage 4A Upstream Researcher and modify its system prompt. Tap Save.
+4. **Trigger Analysis:** Switch to Create, build an alert, and send it. Switch to Analyze and watch the enabled gate actively review the stage output.
+
+### Human Intervention Demo
+
+1. **Configure Strict Policy:** In Governance, enable Gate 3 with prompt "Always reject output that mentions isolated_incident."
+2. **Trigger Rejection:** Create an alert that will produce pattern output containing "isolated_incident."
+3. **Watch Auto-Retry:** The gate turns red, then the pipeline retries automatically up to 3 times.
+4. **Arbitrate:** After 3 failures, the Human Intervention screen appears. Review the attempt history and tap **Accept Station Version** to override (gate turns orange) or **Accept GaaS Assessment** to abandon.
 
 **Total demo time:** 3 minutes from creation to governance insight.
 
@@ -269,8 +289,6 @@ The system consumes 5 integrated data sources:
 # Or download CI artifact from GitHub Actions
 ```
 
-The generated APK is named **DQ Agent - GaaS** (via `versionName`) and uses applicationId suffix `.gaas` so it installs alongside the main branch APK without conflict.
-
 ### Install
 
 ```bash
@@ -284,7 +302,7 @@ adb install app-debug.apk
 App requires `MANAGE_EXTERNAL_STORAGE` (Android 11+) to read:
 - LLM model from `/Download/GhostModels/`
 - DQ data files from `/Download/GhostModels/DQAgent/data/`
-- GaaS governance files from `/Download/GhostModels/DQAgent/data/`
+- GaaS config files from `/Download/GhostModels/DQAgent/state/`
 
 ---
 
@@ -293,24 +311,22 @@ App requires `MANAGE_EXTERNAL_STORAGE` (Android 11+) to read:
 - **Locked portrait orientation** — prevents accidental screen rotation from resetting pipeline state/presets during analysis.
 - **Expandable stage outputs** — Stage 4a, 4b, and 4c cards show truncated previews by default to save vertical space. Tap **Expand** to view the full report inline; tap **Collapse** to return to the preview.
 - **Persistent stage visibility** — after the pipeline completes, all stage outputs remain visible in the scrollable feed.
-- **Governance status chips** — small colored indicators on each stage card showing GaaS approval state (✓ ⏳ ✕ ⚠ ✎).
-- **Violation modals** — when a policy is violated, a modal appears with the policy name, triggered content, remediation action, and Approve/Block buttons.
+- **Markdown text rendering** — all generated text (agent thoughts, GaaS feedback, tooltips, intervention screen) renders actual bold, italic, and bullet formatting instead of raw markdown syntax.
 
 ## Project Status
 
-**Branch:** `gaas-enhancement` — Governance-as-a-Service multi-agent framework
+**Branch:** `gaas-fast` — Lightweight Governance-as-a-Service with auto-retry and human arbitration
 
-**Current:** MVP complete — 4-stage pipeline functional, GaaS governance layer active, demo-ready
+**Current:** MVP complete — 6-stage pipeline functional, Fast GaaS governance layer active, demo-ready
 
-**GaaS Features Delivered:**
-- ✅ Trust Score Management (7 agents, persistent scores, autonomy levels)
-- ✅ Policy Engine (5 default + dynamic creation, runtime evaluation)
-- ✅ Agent Negotiation Mediator (4a/4b conflict detection + mediation)
-- ✅ Escalation Router (4 levels, smart prioritization)
-- ✅ Audit & Forensics (immutable log, playback, compliance export)
-- ✅ Governance Cockpit (new tab with Trust Dashboard, Policy Center, Decision Queue, Audit Playback)
-- ✅ Metro Map Visualization (interactive pipeline map with stations, gates, train, pan/zoom, tooltips)
-- ✅ Dynamic Gate-to-Policy Coupling (gate tooltips read live from `PolicyEngine` descriptions)
+**Fast GaaS Features Delivered:**
+- ✅ 5 Configurable Gate Gaps (toggle + custom policy prompt per gate)
+- ✅ 6 Station-Agent Prompt Editors (editable system prompts for all stages)
+- ✅ Auto-Retry Loop (up to 3 attempts with feedback injection for LLM stages)
+- ✅ Human Intervention Screen (arbitration UI with attempt history)
+- ✅ Metro Map Visualization (6 stations, 5 gates, 6 visual states, animated train)
+- ✅ Markdown Text Rendering (bold, italic, bullets throughout UI)
+- ✅ Fixed GaaS System Prompt (visible in Governance tab)
 
 **Next:** Integration with live DQ feed (replace file drop with real-time API)
 

@@ -39,10 +39,10 @@ fun MetroMapScreen(
     val downstream by pipelineManager.downstreamReport.collectAsState()
 
     val govStatus by GaaSController.governanceStatus.collectAsState()
-    val violationModal by GaaSController.violationModal.collectAsState()
-    val activeNegotiation by AgentNegotiator.activeNegotiations.collectAsState()
-    val pendingApprovals by EscalationRouter.pendingApprovals.collectAsState()
     val pipelineBlocked by GaaSController.pipelineBlocked.collectAsState()
+    val gateVisualStates by GaaSController.gateVisualStates.collectAsState()
+    val blockState by GaaSController.blockState.collectAsState()
+    val humanInterventionRequired by GaaSController.humanInterventionRequired.collectAsState()
 
     var isPanelExpanded by remember { mutableStateOf(false) }
     var elapsedSeconds by remember { mutableStateOf(0) }
@@ -60,7 +60,6 @@ fun MetroMapScreen(
     // Reset timer when new analysis starts
     LaunchedEffect(pipelineManager.currentAlertDataset) {
         elapsedSeconds = 0
-        vm.clearPolicyResults()
     }
 
     // Animate train based on stage
@@ -83,8 +82,6 @@ fun MetroMapScreen(
                 agentId = "stage1",
                 agentName = "Triage Agent",
                 agentRole = "Severity assessment",
-                trustScore = TrustScoreManager.getScore("stage1")?.score ?: 50,
-                autonomyLevel = TrustScoreManager.getAutonomyLevel("stage1").label,
                 reasoning = s1,
                 evidence = listOf("reports.json"),
                 confidence = 0.95f
@@ -93,8 +90,6 @@ fun MetroMapScreen(
                 agentId = "stage2",
                 agentName = "Context Builder",
                 agentRole = "Entity lookup",
-                trustScore = TrustScoreManager.getScore("stage2")?.score ?: 50,
-                autonomyLevel = TrustScoreManager.getAutonomyLevel("stage2").label,
                 reasoning = s2,
                 evidence = listOf("entities.json", "catalog_columns.json"),
                 confidence = 0.92f
@@ -103,8 +98,6 @@ fun MetroMapScreen(
                 agentId = "stage3",
                 agentName = "Pattern Detector",
                 agentRole = "Anomaly detection",
-                trustScore = TrustScoreManager.getScore("stage3")?.score ?: 50,
-                autonomyLevel = TrustScoreManager.getAutonomyLevel("stage3").label,
                 reasoning = s3,
                 evidence = listOf("dq_alerts.json", "entities.json"),
                 confidence = 0.88f
@@ -113,8 +106,6 @@ fun MetroMapScreen(
                 agentId = "stage4a",
                 agentName = "Upstream Researcher",
                 agentRole = "Technical root cause",
-                trustScore = TrustScoreManager.getScore("stage4a")?.score ?: 50,
-                autonomyLevel = TrustScoreManager.getAutonomyLevel("stage4a").label,
                 reasoning = upstream.take(300),
                 evidence = listOf("catalog_columns.json", "dq_knowledge.json"),
                 confidence = 0.85f,
@@ -124,8 +115,6 @@ fun MetroMapScreen(
                 agentId = "stage4b",
                 agentName = "Downstream Researcher",
                 agentRole = "Business impact",
-                trustScore = TrustScoreManager.getScore("stage4b")?.score ?: 50,
-                autonomyLevel = TrustScoreManager.getAutonomyLevel("stage4b").label,
                 reasoning = downstream.take(300),
                 evidence = listOf("reports.json", "dq_knowledge.json"),
                 confidence = 0.82f,
@@ -135,8 +124,6 @@ fun MetroMapScreen(
                 agentId = "stage4c",
                 agentName = "Synthesizer",
                 agentRole = "Executive narrative",
-                trustScore = TrustScoreManager.getScore("stage4c")?.score ?: 50,
-                autonomyLevel = TrustScoreManager.getAutonomyLevel("stage4c").label,
                 reasoning = s4.take(400),
                 evidence = listOf("stage4a.json", "stage4b.json"),
                 confidence = 0.90f
@@ -155,81 +142,16 @@ fun MetroMapScreen(
         }
     }
 
-    // Handle negotiation
-    LaunchedEffect(activeNegotiation) {
-        vm.setNegotiationVisible(activeNegotiation.isNotEmpty())
-    }
-
-    // Build policy results from governance state
-    LaunchedEffect(govStatus) {
-        val decision = GaaSController.activeDecision.value
-        if (decision != null) {
-            decision.policyViolations.forEach { v ->
-                vm.addPolicyResult(
-                    PolicyResultDisplay(
-                        policyId = v.policyId,
-                        policyName = v.policyName,
-                        category = v.category,
-                        status = if (govStatus == GovernanceStatus.BLOCKED) PolicyDisplayStatus.BLOCKED
-                        else if (govStatus == GovernanceStatus.MODIFIED) PolicyDisplayStatus.REMEDIATED
-                        else PolicyDisplayStatus.PASSED,
-                        details = v.reason,
-                        beforeValue = v.triggeredContent,
-                        afterValue = v.remediation
-                    )
-                )
-            }
-        }
-    }
-
-    // Violation modal
-    violationModal?.let { violation ->
-        AlertDialog(
-            onDismissRequest = { },
-            title = { Text("🛡 Policy Violation") },
-            text = {
-                Column {
-                    Text(violation.policyName, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(violation.reason)
-                    if (violation.triggeredContent != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Surface(
-                            color = Color(0xFFFFEBEE),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                violation.triggeredContent,
-                                modifier = Modifier.padding(8.dp),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = { GaaSController.resolveViolation(true) }) {
-                    Text("Approve & Continue")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { GaaSController.resolveViolation(false) }) {
-                    Text("Block")
-                }
-            }
-        )
-    }
-
     Column(modifier = modifier.fillMaxSize()) {
         // Metro Map Canvas (top ~45%)
         MetroMapCanvas(
             stage = stage,
             trainPosition = vm.trainPosition.value,
-            govStatus = govStatus,
+            gateVisualStates = gateVisualStates,
             pipelineBlocked = pipelineBlocked,
-            activeNegotiation = activeNegotiation.firstOrNull(),
+            blockState = blockState,
             alertDataset = pipelineManager.currentAlertDataset,
-            severity = "Critical", // Would come from alert
+            severity = "Critical",
             dimension = "Adaptability",
             elapsedSeconds = elapsedSeconds,
             progressPercent = ((stage / 50f) * 100).toInt(),
@@ -238,24 +160,36 @@ fun MetroMapScreen(
                 .weight(1f)
         )
 
-        // Policy evaluations
-        val policyResults by vm.policyResults.collectAsState()
-        PolicyEvaluationPanel(results = policyResults)
-
         // Agent thought panel
         val thought by vm.activeAgentThought.collectAsState()
-        val negotiation by vm.negotiationVisible.collectAsState()
-        val currentNeg = activeNegotiation.firstOrNull()
 
         AgentThoughtPanel(
             thought = thought,
-            negotiation = if (negotiation) currentNeg else null,
             isExpanded = isPanelExpanded,
             onToggleExpand = { isPanelExpanded = !isPanelExpanded },
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight()
         )
+
+        // Human intervention overlay
+        if (humanInterventionRequired && blockState != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFFF5F5F5))
+            ) {
+                HumanInterventionScreen(
+                    blockState = blockState,
+                    onAcceptStation = {
+                        GaaSController.resolveHumanIntervention(acceptStation = true)
+                    },
+                    onAcceptGaaS = {
+                        GaaSController.resolveHumanIntervention(acceptStation = false)
+                    }
+                )
+            }
+        }
     }
 }
 
@@ -263,9 +197,9 @@ fun MetroMapScreen(
 private fun MetroMapCanvas(
     stage: Int,
     trainPosition: Float,
-    govStatus: GovernanceStatus,
+    gateVisualStates: Map<String, GateVisualState>,
     pipelineBlocked: Boolean,
-    activeNegotiation: AgentNegotiation?,
+    blockState: GaaSBlockState?,
     alertDataset: String,
     severity: String,
     dimension: String,
@@ -288,20 +222,14 @@ private fun MetroMapCanvas(
         StationDef("STAGE 4C", "Synthesis", "stage4c", 1120f, "Executive narrative generation combining upstream and downstream findings.")
     )
 
-    val policies = remember { PolicyEngine.getActivePolicies() }
-    val gateDefs = remember(policies) {
-        policies
-            .filter { it.gateOrder >= 0 }
-            .sortedBy { it.gateOrder }
-            .mapIndexed { index, policy ->
-                GateDef(
-                    label = policy.name,
-                    x = 220f + index * 200f,
-                    afterStation = index,
-                    policyId = policy.policyId
-                )
-            }
-    }
+    // Fixed 5 gates between the 6 stations
+    val gateDefs = listOf(
+        GateDef("Gate 1", "gate1", 220f, 0),
+        GateDef("Gate 2", "gate2", 420f, 1),
+        GateDef("Gate 3", "gate3", 620f, 2),
+        GateDef("Gate 4", "gate4", 820f, 3),
+        GateDef("Gate 5", "gate5", 1020f, 4)
+    )
 
     LaunchedEffect(activeTooltip) {
         if (activeTooltip != null) {
@@ -319,6 +247,12 @@ private fun MetroMapCanvas(
         startX + (endX - startX) * frac
     }
     val trainY = centerY - 60f
+
+    // Determine which gate the train is waiting at
+    val waitingAtGate = if (pipelineBlocked && blockState != null) {
+        val gate = gateDefs.find { it.gateId == blockState.gateId }
+        gate?.let { "Waiting at ${it.label}" }
+    } else null
 
     BoxWithConstraints(
         modifier = modifier
@@ -383,12 +317,15 @@ private fun MetroMapCanvas(
                     )
 
                     // GaaS segment (dashed/animated)
-                    val gateColor = when (govStatus) {
-                        GovernanceStatus.PENDING -> Color(0xFF9CA3AF)
-                        GovernanceStatus.APPROVED -> Color(0xFF00BFA5)
-                        GovernanceStatus.BLOCKED -> Color(0xFFD50000)
-                        GovernanceStatus.ESCALATED -> Color(0xFF7C4DFF)
-                        GovernanceStatus.MODIFIED -> Color(0xFF1A237E)
+                    val gateId = gateDefs.getOrNull(i)?.gateId
+                    val gateState = gateId?.let { gateVisualStates[it] } ?: GateVisualState.INACTIVE
+                    val gateColor = when (gateState) {
+                        GateVisualState.INACTIVE -> Color(0xFF9CA3AF)
+                        GateVisualState.ACTIVE -> Color(0xFF2196F3)
+                        GateVisualState.REVIEWING -> Color(0xFFFFAB00)
+                        GateVisualState.REJECTED -> Color(0xFFD50000)
+                        GateVisualState.APPROVED -> Color(0xFF00BFA5)
+                        GateVisualState.OVERRIDDEN -> Color(0xFFFF6D00)
                     }
                     drawLine(
                         color = gateColor,
@@ -396,32 +333,9 @@ private fun MetroMapCanvas(
                         end = Offset(endX - 28f, centerY),
                         strokeWidth = 4.dp.toPx(),
                         cap = StrokeCap.Round,
-                        pathEffect = if (govStatus == GovernanceStatus.PENDING && stage > i + 1)
+                        pathEffect = if (gateState == GateVisualState.REVIEWING)
                             PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f)
                         else null
-                    )
-                }
-
-                // Negotiation loop (between 4a and 4b)
-                if (activeNegotiation != null) {
-                    val s4aX = stationDefs[3].x
-                    val s4bX = stationDefs[4].x
-                    val loopPath = Path().apply {
-                        moveTo(s4aX + 28f, centerY)
-                        cubicTo(
-                            s4aX + 80f, centerY + 80f,
-                            s4bX - 80f, centerY + 80f,
-                            s4bX - 28f, centerY
-                        )
-                    }
-                    drawPath(
-                        path = loopPath,
-                        color = Color(0xFF7C4DFF),
-                        style = Stroke(
-                            width = 3.dp.toPx(),
-                            cap = StrokeCap.Round,
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
-                        )
                     )
                 }
             }
@@ -445,8 +359,6 @@ private fun MetroMapCanvas(
                     else -> StationState.PENDING
                 }
 
-                val trustScore = TrustScoreManager.getScore(def.agentId)?.score ?: 50
-
                 Box(
                     modifier = Modifier
                         .offset(x = def.x.dp - 28.dp, y = (centerY - 28f).dp)
@@ -454,7 +366,6 @@ private fun MetroMapCanvas(
                     MetroStation(
                         label = def.label,
                         agentName = def.agentName,
-                        trustScore = trustScore,
                         state = state,
                         isFocused = false,
                         onClick = {
@@ -471,25 +382,23 @@ private fun MetroMapCanvas(
 
             // Gates
             gateDefs.forEach { gate ->
-                val state = when (govStatus) {
-                    GovernanceStatus.PENDING -> GateState.EVALUATING
-                    GovernanceStatus.APPROVED -> GateState.APPROVED
-                    GovernanceStatus.BLOCKED -> GateState.BLOCKED
-                    GovernanceStatus.ESCALATED -> GateState.ESCALATED
-                    GovernanceStatus.MODIFIED -> GateState.APPROVED
-                }
+                val state = gateVisualStates[gate.gateId] ?: GateVisualState.INACTIVE
                 Box(
                     modifier = Modifier
                         .offset(x = gate.x.dp - 26.dp, y = (centerY - 26f).dp)
                 ) {
                     MetroGate(
                         label = gate.label,
-                        state = if (stage > gate.afterStation) state else GateState.APPROVED,
+                        state = state,
                         onClick = {
-                            val policyDesc = PolicyEngine.getPolicy(gate.policyId)?.description
+                            val policy = GovernanceConfig.getPolicy(gate.gateId)
                             activeTooltip = TooltipInfo(
-                                title = "${gate.label} Gate",
-                                description = policyDesc ?: "Policy description unavailable",
+                                title = gate.label,
+                                description = if (policy?.enabled == true) {
+                                    policy.prompt.ifBlank { "Policy enabled but no prompt configured." }
+                                } else {
+                                    "No policy configured for this gate."
+                                },
                                 itemX = gate.x,
                                 itemY = centerY - 90f
                             )
@@ -522,7 +431,7 @@ private fun MetroMapCanvas(
             if (stage >= 1) {
                 Box(
                     modifier = Modifier
-                        .offset(x = trainX.dp - 80.dp, y = (trainY - 40f).dp)
+                        .offset(x = trainX.dp - 90.dp, y = (trainY - 40f).dp)
                 ) {
                     MetroTrain(
                         alertDataset = alertDataset.ifBlank { "No Alert" },
@@ -531,7 +440,8 @@ private fun MetroMapCanvas(
                         elapsedSeconds = elapsedSeconds,
                         progressPercent = progressPercent,
                         isBlocked = pipelineBlocked,
-                        isActive = stage in 1..49
+                        isActive = stage in 1..49,
+                        waitingAtGate = waitingAtGate
                     )
                 }
             }
@@ -541,7 +451,7 @@ private fun MetroMapCanvas(
 }
 
 private data class StationDef(val label: String, val agentName: String, val agentId: String, val x: Float, val description: String)
-private data class GateDef(val label: String, val x: Float, val afterStation: Int, val policyId: String)
+private data class GateDef(val label: String, val gateId: String, val x: Float, val afterStation: Int)
 
 private data class TooltipInfo(
     val title: String,
@@ -586,7 +496,7 @@ private fun TooltipCard(
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = description,
+                text = parseMarkdownToAnnotatedString(description),
                 fontSize = 11.sp,
                 color = Color(0xFFD1D5DB),
                 lineHeight = 16.sp

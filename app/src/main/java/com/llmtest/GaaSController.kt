@@ -1,239 +1,209 @@
 package com.llmtest
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import java.util.UUID
 
 object GaaSController {
-    private val _governanceDecisions = MutableStateFlow<List<GovernanceDecision>>(emptyList())
-    val governanceDecisions: StateFlow<List<GovernanceDecision>> = _governanceDecisions
 
-    private val _activeDecision = MutableStateFlow<GovernanceDecision?>(null)
-    val activeDecision: StateFlow<GovernanceDecision?> = _activeDecision
+    private val _governanceStatus = MutableStateFlow(GovernanceStatus.IDLE)
+    val governanceStatus: StateFlow<GovernanceStatus> = _governanceStatus
+
+    private val _currentGate = MutableStateFlow<String?>(null)
+    val currentGate: StateFlow<String?> = _currentGate
+
+    private val _blockState = MutableStateFlow<GaaSBlockState?>(null)
+    val blockState: StateFlow<GaaSBlockState?> = _blockState
 
     private val _pipelineBlocked = MutableStateFlow(false)
     val pipelineBlocked: StateFlow<Boolean> = _pipelineBlocked
 
-    private val _governanceStatus = MutableStateFlow<GovernanceStatus>(GovernanceStatus.PENDING)
-    val governanceStatus: StateFlow<GovernanceStatus> = _governanceStatus
+    private val _humanInterventionRequired = MutableStateFlow(false)
+    val humanInterventionRequired: StateFlow<Boolean> = _humanInterventionRequired
 
-    private val _violationModal = MutableStateFlow<PolicyViolation?>(null)
-    val violationModal: StateFlow<PolicyViolation?> = _violationModal
+    private val _humanResolution = MutableStateFlow<HumanResolution?>(null)
 
-    private val _lastCheckpoint = MutableStateFlow<Int?>(null)
-    val lastCheckpoint: StateFlow<Int?> = _lastCheckpoint
+    // Gate visual states for the 5 gaps
+    private val _gateVisualStates = MutableStateFlow<Map<String, GateVisualState>>(emptyMap())
+    val gateVisualStates: StateFlow<Map<String, GateVisualState>> = _gateVisualStates
 
     fun initialize() {
-        // Ensure all data files exist
-        TrustScoreManager.getAllScores()
-        PolicyEngine.getPolicies()
-        AuditLogger.readAll()
-        BugLogger.log("GaaS Controller initialized")
-    }
-
-    fun preStageHook(alert: DQAlert, stage: Int): Boolean {
-        val scores = TrustScoreManager.getSnapshot()
-        val agentId = stageToAgentId(stage)
-        val decision = GovernanceDecision(
-            decisionId = UUID.randomUUID().toString(),
-            alertDataset = alert.datasetName,
-            stage = stage,
-            status = GovernanceStatus.PENDING,
-            trustScoresAtDecision = scores
-        )
-        _activeDecision.value = decision
-        _governanceStatus.value = GovernanceStatus.PENDING
-        _lastCheckpoint.value = stage
-
-        // Evaluate trust-based autonomy
-        val autonomy = agentId?.let { TrustScoreManager.getAutonomyLevel(it) } ?: AutonomyLevel.TRAINING
-        if (autonomy == AutonomyLevel.TRAINING && stage >= 41) {
-            // Low trust agents need oversight on LLM stages
-            _governanceStatus.value = GovernanceStatus.ESCALATED
-        }
-
-        return true
-    }
-
-    fun postStageHook(
-        alert: DQAlert,
-        stage: Int,
-        output: String,
-        metadata: Map<String, String> = emptyMap()
-    ): PostStageResult {
-        val agentId = stageToAgentId(stage) ?: return PostStageResult.ALLOW
-        val trustScore = TrustScoreManager.getScore(agentId)?.score ?: 0
-
-        // Evaluate policies
-        val violations = PolicyEngine.evaluate(
-            content = output,
-            alert = alert,
-            agentId = agentId,
-            metadata = metadata
-        )
-
-        if (violations.isNotEmpty()) {
-            // Log violations
-            val criticalViolation = violations.find { it.policyId == "critical_alert_oversight" || it.policyId == "exec_contact_approval" }
-            if (criticalViolation != null) {
-                _violationModal.value = criticalViolation
-                _governanceStatus.value = GovernanceStatus.BLOCKED
-                _pipelineBlocked.value = true
-
-                val decision = _activeDecision.value?.copy(
-                    status = GovernanceStatus.BLOCKED,
-                    policyViolations = violations,
-                    policiesApplied = violations.map { it.policyId }
-                )
-                decision?.let { updateDecision(it) }
-
-                // Route escalation
-                EscalationRouter.route(alert, agentId, violations)
-
-                return PostStageResult.BLOCK(violations)
-            }
-
-            // Auto-remediate PII
-            val piiViolations = violations.filter { it.policyId == "pii_prevention" }
-            if (piiViolations.isNotEmpty()) {
-                val remediated = PolicyEngine.applyRemediation(output, piiViolations)
-                val decision = _activeDecision.value?.copy(
-                    status = GovernanceStatus.MODIFIED,
-                    policyViolations = violations,
-                    policiesApplied = violations.map { it.policyId }
-                )
-                decision?.let { updateDecision(it) }
-
-                AuditLogger.logDecision(
-                    agentIds = listOf(agentId),
-                    alertDataset = alert.datasetName,
-                    stage = stage,
-                    trustScores = mapOf(agentId to trustScore),
-                    policiesApplied = violations.map { it.policyId },
-                    violations = violations,
-                    inputData = output,
-                    decision = "Auto-remediated PII"
-                )
-
-                return PostStageResult.MODIFY(remediated)
-            }
-
-            // Other violations - notify and log
-            val decision = _activeDecision.value?.copy(
-                status = GovernanceStatus.ESCALATED,
-                policyViolations = violations,
-                policiesApplied = violations.map { it.policyId },
-                escalationReason = violations.joinToString("; ") { it.reason }
-            )
-            decision?.let { updateDecision(it) }
-
-            EscalationRouter.route(alert, agentId, violations)
-            return PostStageResult.ESCALATE(violations)
-        }
-
-        // No violations - approve
-        val decision = _activeDecision.value?.copy(
-            status = GovernanceStatus.APPROVED,
-            policiesApplied = PolicyEngine.getActivePolicies().map { it.policyId }
-        )
-        decision?.let { updateDecision(it) }
-        _governanceStatus.value = GovernanceStatus.APPROVED
-
-        AuditLogger.logDecision(
-            agentIds = listOf(agentId),
-            alertDataset = alert.datasetName,
-            stage = stage,
-            trustScores = mapOf(agentId to trustScore),
-            policiesApplied = PolicyEngine.getActivePolicies().map { it.policyId },
-            violations = emptyList(),
-            decision = "Approved"
-        )
-
-        return PostStageResult.ALLOW
-    }
-
-    fun postStage4Hook(
-        alert: DQAlert,
-        stage4aReport: String,
-        stage4bReport: String
-    ): Boolean {
-        val hasConflict = AgentNegotiator.detectConflict(alert, stage4aReport, stage4bReport)
-        if (hasConflict) {
-            AgentNegotiator.startNegotiation(alert, stage4aReport, stage4bReport)
-            val agentId = "stage4a"
-            val violations = PolicyEngine.evaluate(
-                content = stage4aReport,
-                alert = alert,
-                agentId = agentId
-            )
-            EscalationRouter.route(alert, agentId, violations, hasConflict = true)
-            _pipelineBlocked.value = true
-            return true
-        }
-        return false
-    }
-
-    fun resolveViolation(approved: Boolean, notes: String? = null) {
-        val violation = _violationModal.value ?: return
-        if (approved) {
-            _governanceStatus.value = GovernanceStatus.APPROVED
-            _pipelineBlocked.value = false
-            val decision = _activeDecision.value?.copy(
-                status = GovernanceStatus.APPROVED,
-                escalationReason = notes ?: "Human override approved"
-            )
-            decision?.let { updateDecision(it) }
-            AuditLogger.logHumanOverride("coordinator", "Approved policy violation: ${violation.policyName}", notes ?: "")
-        } else {
-            val decision = _activeDecision.value?.copy(
-                status = GovernanceStatus.BLOCKED,
-                escalationReason = notes ?: "Human override rejected"
-            )
-            decision?.let { updateDecision(it) }
-            AuditLogger.logHumanOverride("coordinator", "Rejected policy violation: ${violation.policyName}", notes ?: "")
-        }
-        _violationModal.value = null
-    }
-
-    fun resumePipeline() {
+        GovernanceConfig.loadPolicies()
+        GovernanceConfig.loadStationPrompts()
+        _governanceStatus.value = GovernanceStatus.IDLE
         _pipelineBlocked.value = false
-        _governanceStatus.value = GovernanceStatus.APPROVED
+        _humanInterventionRequired.value = false
+        _blockState.value = null
+        _humanResolution.value = null
+        _currentGate.value = null
+        resetGateVisualStates()
+        BugLogger.log("Fast GaaS Controller initialized")
     }
 
-    fun recordDecisionAccuracy(agentId: String, wasCorrect: Boolean) {
-        TrustScoreManager.recordDecision(agentId, wasCorrect)
+    fun resetGateVisualStates() {
+        val policies = GovernanceConfig.loadPolicies()
+        val states = mutableMapOf<String, GateVisualState>()
+        listOf("gate1", "gate2", "gate3", "gate4", "gate5").forEach { gateId ->
+            val policy = policies.find { it.gateId == gateId }
+            states[gateId] = if (policy?.enabled == true) GateVisualState.ACTIVE else GateVisualState.INACTIVE
+        }
+        _gateVisualStates.value = states
     }
 
-    fun updateTrustScore(agentId: String, delta: Int, reason: String) {
-        val current = TrustScoreManager.getScore(agentId)?.score ?: 50
-        TrustScoreManager.updateScore(agentId, current + delta, reason)
+    fun updateGateVisualState(gateId: String, state: GateVisualState) {
+        val current = _gateVisualStates.value.toMutableMap()
+        current[gateId] = state
+        _gateVisualStates.value = current
     }
 
-    fun getDecisionForAlert(datasetName: String): GovernanceDecision? {
-        return _governanceDecisions.value.find { it.alertDataset == datasetName }
+    fun checkGapPolicy(completedStage: Int): GaaSPolicy? {
+        val gateId = when (completedStage) {
+            1 -> "gate1"
+            2 -> "gate2"
+            3 -> "gate3"
+            41 -> "gate4"
+            42 -> "gate5"
+            else -> return null
+        }
+        _currentGate.value = gateId
+        val policy = GovernanceConfig.getPolicy(gateId)
+        return if (policy?.enabled == true) policy else null
     }
 
-    private fun updateDecision(decision: GovernanceDecision) {
-        _governanceDecisions.value = _governanceDecisions.value.filter { it.decisionId != decision.decisionId } + decision
-        _activeDecision.value = decision
-    }
-
-    private fun stageToAgentId(stage: Int): String? {
+    fun getGateIdForStage(stage: Int): String? {
         return when (stage) {
-            1 -> "stage1"
-            2 -> "stage2"
-            3 -> "stage3"
-            41 -> "stage4a"
-            42 -> "stage4b"
-            43 -> "stage4c"
+            1 -> "gate1"
+            2 -> "gate2"
+            3 -> "gate3"
+            41 -> "gate4"
+            42 -> "gate5"
             else -> null
         }
     }
-}
 
-sealed class PostStageResult {
-    object ALLOW : PostStageResult()
-    data class BLOCK(val violations: List<PolicyViolation>) : PostStageResult()
-    data class ESCALATE(val violations: List<PolicyViolation>) : PostStageResult()
-    data class MODIFY(val remediatedOutput: String) : PostStageResult()
+    fun buildReviewPrompt(policy: GaaSPolicy, stageOutput: String): String {
+        return buildString {
+            appendLine("You are the Governance Agent. Review the following output against the policy. Respond only with APPROVED: [reasoning] or REJECTED: [feedback]. If REJECTED, provide structured bullet-point feedback.")
+            appendLine()
+            appendLine("=== POLICY ===")
+            appendLine(policy.prompt)
+            appendLine()
+            appendLine("=== OUTPUT TO REVIEW ===")
+            appendLine(stageOutput.take(1500)) // Truncate to stay within token limits
+        }
+    }
+
+    fun parseReviewResponse(response: String): ReviewResult {
+        val trimmed = response.trim()
+        return when {
+            trimmed.startsWith("APPROVED:", ignoreCase = true) -> {
+                ReviewResult.Approved(trimmed.removePrefix("APPROVED:").trim())
+            }
+            trimmed.startsWith("REJECTED:", ignoreCase = true) -> {
+                val feedbackText = trimmed.removePrefix("REJECTED:").trim()
+                val bullets = feedbackText.lines()
+                    .map { it.trim() }
+                    .filter { it.startsWith("-") || it.startsWith("•") || it.startsWith("*") || it.isNotBlank() }
+                    .map { it.trimStart('-', '•', ' ', '*') }
+                    .filter { it.isNotBlank() }
+                ReviewResult.Rejected(bullets.ifEmpty { listOf(feedbackText) })
+            }
+            else -> {
+                // Fallback heuristics
+                when {
+                    trimmed.contains("APPROVED", ignoreCase = true) -> ReviewResult.Approved(trimmed)
+                    trimmed.contains("REJECTED", ignoreCase = true) -> {
+                        val bullets = trimmed.lines().map { it.trim() }.filter { it.isNotBlank() }
+                        ReviewResult.Rejected(bullets)
+                    }
+                    else -> ReviewResult.Approved("Parsed as approved (response did not contain clear APPROVED/REJECTED marker)")
+                }
+            }
+        }
+    }
+
+    fun markReviewing(gateId: String) {
+        _governanceStatus.value = GovernanceStatus.REVIEWING
+        updateGateVisualState(gateId, GateVisualState.REVIEWING)
+    }
+
+    fun markApproved(gateId: String) {
+        _governanceStatus.value = GovernanceStatus.APPROVED
+        _pipelineBlocked.value = false
+        updateGateVisualState(gateId, GateVisualState.APPROVED)
+        GovernanceConfig.clearBlockState()
+    }
+
+    fun markRejected(gateId: String, previousStage: Int, feedback: List<String>, outputSnapshot: String) {
+        val currentBlock = _blockState.value
+        val history = currentBlock?.history?.toMutableList() ?: mutableListOf()
+
+        // Save previous attempt to history if it exists
+        currentBlock?.let { block ->
+            if (block.outputSnapshot.isNotBlank()) {
+                history.add(
+                    AttemptRecord(
+                        attemptNumber = block.retryCount,
+                        outputSnapshot = block.outputSnapshot,
+                        feedback = block.feedback
+                    )
+                )
+            }
+        }
+
+        val newRetryCount = (currentBlock?.retryCount ?: 0) + 1
+        val newBlock = GaaSBlockState(
+            gateId = gateId,
+            previousStage = previousStage,
+            feedback = feedback,
+            retryCount = newRetryCount,
+            timestamp = System.currentTimeMillis(),
+            history = history,
+            outputSnapshot = outputSnapshot
+        )
+        _blockState.value = newBlock
+        GovernanceConfig.saveBlockState(newBlock)
+        _governanceStatus.value = GovernanceStatus.REJECTED
+        _pipelineBlocked.value = true
+        updateGateVisualState(gateId, GateVisualState.REJECTED)
+
+        BugLogger.log("Gate $gateId rejected (attempt $newRetryCount): ${feedback.joinToString("; ")}")
+    }
+
+    fun requireHumanIntervention() {
+        _humanInterventionRequired.value = true
+    }
+
+    fun resolveHumanIntervention(acceptStation: Boolean) {
+        val gateId = _currentGate.value ?: return
+        if (acceptStation) {
+            _governanceStatus.value = GovernanceStatus.OVERRIDDEN
+            _pipelineBlocked.value = false
+            _humanResolution.value = HumanResolution.Proceed
+            updateGateVisualState(gateId, GateVisualState.OVERRIDDEN)
+            BugLogger.log("Human intervention: accepted station version at $gateId")
+        } else {
+            _governanceStatus.value = GovernanceStatus.ABANDONED
+            _pipelineBlocked.value = false
+            _humanResolution.value = HumanResolution.Abandon
+            updateGateVisualState(gateId, GateVisualState.REJECTED)
+            BugLogger.log("Human intervention: accepted GaaS assessment at $gateId (abandoned)")
+        }
+        _humanInterventionRequired.value = false
+    }
+
+    suspend fun waitForHumanResolution(): HumanResolution? {
+        var waited = 0
+        while (_humanResolution.value == null && waited < 600) { // 10 minutes max
+            delay(1000)
+            waited++
+        }
+        return _humanResolution.value.also { _humanResolution.value = null }
+    }
+
+    fun abandonPipeline() {
+        _governanceStatus.value = GovernanceStatus.ABANDONED
+        _pipelineBlocked.value = false
+        _humanInterventionRequired.value = false
+    }
 }

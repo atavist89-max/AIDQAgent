@@ -24,7 +24,8 @@ object Stage4Synthesizer {
         stage4a: Stage4UpstreamResearcher.UpstreamAnalysisState,
         stage4b: Stage4DownstreamResearcher.DownstreamAnalysisState,
         stage3State: AnalysisState,
-        engine: Engine
+        engine: Engine,
+        feedback: List<String> = emptyList()
     ): FinalSynthesisState = withContext(Dispatchers.IO) {
 
         // Load severity info
@@ -58,9 +59,13 @@ object Stage4Synthesizer {
         val ownerLoad = stage3State.ownerLoad ?: 0
         val patternType = stage3State.patternType ?: "isolated"
 
+        // Read system prompt from governance config
+        val systemPrompt = GovernanceConfig.getStationPrompt("stage4c")?.prompt
+            ?: "You are a Senior Data Steward delivering an executive briefing to the Chief Data Officer."
+
         // Build synthesis prompt
         val prompt = buildString {
-            appendLine("You are a Senior Data Steward delivering an executive briefing to the Chief Data Officer.")
+            appendLine(systemPrompt)
             appendLine()
             appendLine("You have received two specialist research reports:")
             appendLine()
@@ -92,6 +97,15 @@ object Stage4Synthesizer {
             
             appendLine("TONE: Urgent but authoritative. Expert investigator briefing leadership. No hedging—state conclusions.")
             appendLine("Use actual names from the research reports. Make it feel like a senior steward who investigated for 2 hours.")
+
+            if (feedback.isNotEmpty()) {
+                appendLine()
+                appendLine("=== GOVERNANCE FEEDBACK ===")
+                appendLine("Your previous output was rejected by Governance. Address this feedback before rewriting:")
+                feedback.forEach { bullet ->
+                    appendLine("- $bullet")
+                }
+            }
         }
 
         BugLogger.log("Stage 4c prompt length: ${prompt.length} chars")

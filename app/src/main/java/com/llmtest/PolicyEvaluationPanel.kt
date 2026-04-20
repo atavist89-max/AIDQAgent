@@ -1,6 +1,5 @@
 package com.llmtest
 
-import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.text.SimpleDateFormat
@@ -105,7 +103,7 @@ private fun PolicyCard(result: PolicyResultDisplay) {
                         text = when (result.status) {
                             PolicyDisplayStatus.EVALUATING -> "EVALUATING..."
                             PolicyDisplayStatus.PASSED -> "PASSED"
-                            PolicyDisplayStatus.BLOCKED -> "ESCALATED"
+                            PolicyDisplayStatus.BLOCKED -> "BLOCKED"
                             PolicyDisplayStatus.REMEDIATED -> "REMEDIATED"
                         },
                         fontSize = 11.sp,
@@ -128,43 +126,15 @@ private fun PolicyCard(result: PolicyResultDisplay) {
                 fontWeight = FontWeight.Medium,
                 color = Color(0xFF1A1A2E)
             )
-            Text(
-                text = result.category.name,
-                fontSize = 11.sp,
-                color = Color(0xFF6B7280)
-            )
 
             if (result.details.isNotBlank()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = result.details,
+                    text = parseMarkdownToAnnotatedString(result.details),
                     fontSize = 11.sp,
                     color = Color(0xFF1A1A2E),
                     lineHeight = 14.sp
                 )
-            }
-
-            if (result.beforeValue != null && result.afterValue != null) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Row {
-                    Text(
-                        text = result.beforeValue,
-                        fontSize = 11.sp,
-                        color = Color(0xFF6B7280),
-                        textDecoration = TextDecoration.LineThrough
-                    )
-                    Text(
-                        text = " → ",
-                        fontSize = 11.sp,
-                        color = Color(0xFF1A237E)
-                    )
-                    Text(
-                        text = result.afterValue,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFFD50000)
-                    )
-                }
             }
         }
     }

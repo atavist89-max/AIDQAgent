@@ -30,6 +30,7 @@ fun MetroTrain(
     progressPercent: Int,
     isBlocked: Boolean,
     isActive: Boolean,
+    waitingAtGate: String? = null,
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "glow")
@@ -73,7 +74,7 @@ fun MetroTrain(
 
         Surface(
             modifier = Modifier
-                .width(160.dp)
+                .width(180.dp)
                 .wrapContentHeight(),
             shape = RoundedCornerShape(16.dp),
             color = Color.White,
@@ -131,6 +132,17 @@ fun MetroTrain(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
+                }
+
+                // Waiting at gate message
+                if (waitingAtGate != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = waitingAtGate,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFFF6D00)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))

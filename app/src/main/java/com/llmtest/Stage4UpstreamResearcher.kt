@@ -22,7 +22,8 @@ object Stage4UpstreamResearcher {
     suspend fun run(
         alert: DQAlert,
         stage3State: AnalysisState,
-        engine: Engine
+        engine: Engine,
+        feedback: List<String> = emptyList()
     ): UpstreamAnalysisState = withContext(Dispatchers.IO) {
 
         // Load enriched context
@@ -49,9 +50,13 @@ object Stage4UpstreamResearcher {
         val healthScore = if (groupTotal > 0) groupPassing.toFloat() / groupTotal else 1.0f
         val groupDatasets = groupDatasetsList.size
 
+        // Read system prompt from governance config (editable in Governance tab)
+        val systemPrompt = GovernanceConfig.getStationPrompt("stage4a")?.prompt
+            ?: "You are a Technical Data Architect investigating a data quality failure."
+
         // Build deep technical prompt
         val prompt = buildString {
-            appendLine("You are a Technical Data Architect investigating a data quality failure in a financial institution.")
+            appendLine(systemPrompt)
             appendLine()
             appendLine("=== INVESTIGATION TARGET ===")
             appendLine("Dataset: ${alert.datasetName}")
@@ -109,6 +114,15 @@ object Stage4UpstreamResearcher {
             appendLine("- Be specific and technical but explain business relevance")
             appendLine("- 200-250 words, professional technical briefing format")
             appendLine("- Do not hedge—state conclusions with confidence levels")
+
+            if (feedback.isNotEmpty()) {
+                appendLine()
+                appendLine("=== GOVERNANCE FEEDBACK ===")
+                appendLine("Your previous output was rejected by Governance. Address this feedback before rewriting:")
+                feedback.forEach { bullet ->
+                    appendLine("- $bullet")
+                }
+            }
         }
 
         BugLogger.log("Stage 4a prompt length: ${prompt.length} chars")

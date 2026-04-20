@@ -22,7 +22,8 @@ object Stage4DownstreamResearcher {
     suspend fun run(
         alert: DQAlert,
         stage3State: AnalysisState,
-        engine: Engine
+        engine: Engine,
+        feedback: List<String> = emptyList()
     ): DownstreamAnalysisState = withContext(Dispatchers.IO) {
 
         // Load reports and severity info
@@ -54,9 +55,13 @@ object Stage4DownstreamResearcher {
         val healthScore = if (groupTotal > 0) groupPassing.toFloat() / groupTotal else 1.0f
         val groupDatasets = groupDatasetsList.size
 
+        // Read system prompt from governance config
+        val systemPrompt = GovernanceConfig.getStationPrompt("stage4b")?.prompt
+            ?: "You are a Business Impact Analyst assessing downstream consequences of a data quality failure."
+
         // Build deep impact prompt
         val prompt = buildString {
-            appendLine("You are a Business Impact Analyst assessing downstream consequences of a data quality failure in a financial institution.")
+            appendLine(systemPrompt)
             appendLine()
             appendLine("=== AFFECTED REPORTS ===")
             if (affectedReports.isNotEmpty()) {
@@ -122,6 +127,15 @@ object Stage4DownstreamResearcher {
             appendLine("- Be specific about who gets notified and why")
             appendLine("- 200-250 words, professional impact assessment format")
             appendLine("- Prioritize Class 2 above all—flag immediate escalation needs")
+
+            if (feedback.isNotEmpty()) {
+                appendLine()
+                appendLine("=== GOVERNANCE FEEDBACK ===")
+                appendLine("Your previous output was rejected by Governance. Address this feedback before rewriting:")
+                feedback.forEach { bullet ->
+                    appendLine("- $bullet")
+                }
+            }
         }
 
         BugLogger.log("Stage 4b prompt length: ${prompt.length} chars")

@@ -6,11 +6,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,7 +28,6 @@ enum class StationState {
 fun MetroStation(
     label: String,
     agentName: String,
-    trustScore: Int,
     state: StationState,
     isFocused: Boolean,
     onClick: () -> Unit,
@@ -118,28 +115,5 @@ fun MetroStation(
             color = Color(0xFF6B7280),
             maxLines = 1
         )
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Trust score pill
-        val trustColor = when {
-            trustScore < 30 -> Color(0xFFD50000)
-            trustScore < 70 -> Color(0xFFFF6D00)
-            trustScore < 90 -> Color(0xFF00BFA5)
-            else -> Color(0xFF7C4DFF)
-        }
-
-        Surface(
-            color = trustColor.copy(alpha = 0.12f),
-            shape = RoundedCornerShape(10.dp)
-        ) {
-            Text(
-                text = "$trustScore",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = trustColor,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-            )
-        }
     }
 }
