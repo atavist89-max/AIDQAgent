@@ -173,14 +173,15 @@ fun MetroMapScreen(
         )
 
         // Human intervention overlay
-        if (humanInterventionRequired && blockState != null) {
+        val currentBlock = blockState
+        if (humanInterventionRequired && currentBlock != null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xFFF5F5F5))
             ) {
                 HumanInterventionScreen(
-                    blockState = blockState,
+                    blockState = currentBlock,
                     onAcceptStation = {
                         GaaSController.resolveHumanIntervention(acceptStation = true)
                     },

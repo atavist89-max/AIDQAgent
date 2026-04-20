@@ -66,3 +66,20 @@ data class AgentThought(
     val confidence: Float,
     val isTyping: Boolean = false
 )
+
+// Kept for PolicyEvaluationPanel compilation compatibility
+data class PolicyResultDisplay(
+    val policyId: String,
+    val policyName: String,
+    val category: String = "",
+    val status: PolicyDisplayStatus = PolicyDisplayStatus.EVALUATING,
+    val timestamp: Long = System.currentTimeMillis(),
+    val details: String = ""
+)
+
+enum class PolicyDisplayStatus {
+    EVALUATING,
+    PASSED,
+    BLOCKED,
+    REMEDIATED
+}
