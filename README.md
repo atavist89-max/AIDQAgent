@@ -15,7 +15,7 @@ This is the **`gaas-enhancement`** branch. It transforms DQ Agent from a reactiv
 |---|---|---|
 | **Question answered** | "What broke?" | "Is our AI workforce making good decisions, and are they following bank policies?" |
 | **User role** | Alert consumer | AI workforce manager |
-| **Key feature** | 4-stage pipeline | Trust scores + policy engine + agent negotiation + audit forensics |
+| **Key feature** | 4-stage pipeline | Trust scores + policy engine + agent negotiation + audit forensics + Metro Map visualization |
 | **APK name** | DQ Agent | **DQ Agent - GaaS** |
 | **Installs alongside?** | — | ✅ Yes (`.gaas` applicationId suffix) |
 
@@ -24,7 +24,7 @@ This is the **`gaas-enhancement`** branch. It transforms DQ Agent from a reactiv
 The GaaS layer sits between the Stage 4 analysis agents and the final output, adding a meta-layer of AI governance:
 
 - **Trust Score Management** — Each AI agent (Stage 1-4) has a persistent Trust Score (0-100). Scores evolve based on decision accuracy. Autonomy levels auto-adjust from "Training Wheels" to "Full Delegation."
-- **Policy Engine with Dynamic Creation** — 5 pre-loaded bank policies (PII Prevention, Executive Contact Approval, Critical Alert Oversight, Audit Trail Completeness, Schema Drift Validation). The Data Quality Coordinator can create new policies in-app without restarting.
+- **Policy Engine with Dynamic Creation** — 5 pre-loaded bank policies (PII Prevention, Executive Contact Approval, Critical Alert Oversight, Audit Trail Completeness, Schema Drift Validation). The Data Quality Coordinator can create new policies in-app without restarting. Policies can be assigned to Metro Map gates so tooltips stay in sync automatically.
 - **Agent Negotiation Mediator** — When Stage 4a (Technical) and 4b (Business) agents disagree, a structured "debate" interface activates with mediation proposals.
 - **Escalation Router** — Four-level smart escalation: Auto-Resolve → Notify & Log → Request Approval → Emergency Human-in-Loop.
 - **Audit & Forensics** — Immutable append-only decision trail with SHA-256 integrity. Playback any decision path. Export for regulatory compliance.
@@ -157,16 +157,24 @@ Token limit (~2,000) requires chunking. Each stage fits within budget while accu
 │   ├── GaaSDataClasses.kt          # 🆕 Governance data models: TrustScore, PolicyRule, AuditRecord, etc.
 │   ├── GaaSController.kt           # 🆕 Central governance orchestrator with pre/post stage hooks
 │   ├── TrustScoreManager.kt        # 🆕 Persistent trust scores, autonomy levels, manual overrides
-│   ├── PolicyEngine.kt             # 🆕 5 default policies + dynamic policy creation/evaluation
+│   ├── PolicyEngine.kt             # 🆕 5 default policies + dynamic creation/evaluation + gate rendering
 │   ├── AgentNegotiator.kt          # 🆕 Conflict detection, structured debate, mediation proposals
 │   ├── EscalationRouter.kt         # 🆕 4-level smart escalation with priority matrix
 │   ├── AuditLogger.kt              # 🆕 Immutable append-only audit trail with SHA-256 hashing
 │   ├── GovernanceScreen.kt         # 🆕 Navigation host for Governance tab
 │   ├── GovernanceDashboard.kt      # 🆕 Trust dashboard with agent cards and stats overview
 │   ├── AgentDetail.kt              # 🆕 Deep-dive into single agent performance history
-│   ├── PolicyEditor.kt             # 🆕 Visual policy creation and management
+│   ├── PolicyEditor.kt             # 🆕 Visual policy creation and management (includes gate label assignment)
 │   ├── DecisionQueue.kt            # 🆕 Pending approvals interface with priority badges
-│   └── AuditPlayback.kt            # 🆕 Timeline replay and compliance export
+│   ├── AuditPlayback.kt            # 🆕 Timeline replay and compliance export
+│   ├── MetroMap.kt                 # 🆕 Interactive pipeline visualization: stations, gates, train, pan/zoom, tooltips
+│   ├── MetroStation.kt             # 🆕 Stage station composable with trust score pill
+│   ├── MetroGate.kt                # 🆕 Governance gate composable (shield diamond)
+│   ├── MetroTrain.kt               # 🆕 Moving alert card showing current analysis progress
+│   ├── MetroMapViewModel.kt        # 🆕 Animation state for train position and policy results
+│   ├── AgentThoughtPanel.kt        # 🆕 Expandable reasoning panel for active agent
+│   ├── PolicyEvaluationPanel.kt    # 🆕 Live policy violation display
+│   └── TrustThermometer.kt         # 🆕 Visual trust score indicator
 ├── build.gradle                    # Root project plugins (Android, Kotlin, Compose, Serialization)
 ├── settings.gradle                 # Project name + repository config (Google, Maven Central)
 ├── gradle.properties               # AndroidX, compile SDK override, JVM heap settings
@@ -193,7 +201,7 @@ Token limit (~2,000) requires chunking. Each stage fits within budget while accu
 | `BugLogger.kt` | Thread-safe file logger. Logs every stage transition, file I/O error, and LLM exception to app-private storage. Accessible via "Logs" button in UI. |
 | `GaaSController.kt` | Central governance orchestrator. Loads policies, coordinates interceptions at stage boundaries, manages pipeline blocking/resume, and handles violation modals. |
 | `TrustScoreManager.kt` | Persists agent trust scores to `trust_scores.json`. Tracks decision accuracy, score history, and autonomy levels. Supports manual overrides with audit logging. |
-| `PolicyEngine.kt` | Evaluates agent outputs against active policies at runtime. Includes 5 default bank policies and supports dynamic policy creation with condition builders. |
+| `PolicyEngine.kt` | Evaluates agent outputs against active policies at runtime. Includes 5 default bank policies + dynamic creation with condition builders. Gates are rendered dynamically from policies with `gateLabel` set. |
 | `AgentNegotiator.kt` | Detects conflicts between Stage 4a and 4b outputs. Activates structured negotiation with visual debate interface and hybrid mediation proposals. |
 | `EscalationRouter.kt` | Routes decisions to appropriate channels based on Trust Score + Policy Requirements + Alert Severity. Maintains pending approval queue with priority badges. |
 | `AuditLogger.kt` | Writes immutable append-only decision records to `audit_log.jsonl`. Includes cryptographic integrity (SHA-256), decision path playback, and compliance export. |
@@ -227,7 +235,7 @@ The system consumes 5 integrated data sources:
 3. **Open the App:** Tap "Create" tab in the Bottom Navigation Bar
 4. **Build the Alert:** Select `postgres` → `beta_hub` → `LINK_ORDER_CUSTOMER` → choose from 5–7 check names. Watch auto-fill populate severity, dimension, and owner email.
 5. **Send:** Tap "Send DQ Alert" → Toast confirms delivery
-6. **Switch to Analyze:** Tap "Analyze" tab. Watch 6-stage progression with **governance status chips** on each stage card (🟢 Approved, 🟡 Pending, 🔴 Blocked)
+6. **Switch to Analyze:** Tap "Analyze" tab. Watch the **Metro Map visualization** — a train moves through 6 stations (Stage 1→4c) with 5 governance gates (TRUST, PII, EXEC, AUDIT, SCHEMA) between them. Tap any station or gate for a tooltip explaining what that step does. The train pauses and pulses when a policy violation blocks the pipeline.
 7. **The Reveal:** Executive Stewardship Report appears with technical briefing, impact assessment, and actionable recommendations
 
 ### Governance Cockpit Demo (GaaS Branch Exclusive)
@@ -301,6 +309,8 @@ App requires `MANAGE_EXTERNAL_STORAGE` (Android 11+) to read:
 - ✅ Escalation Router (4 levels, smart prioritization)
 - ✅ Audit & Forensics (immutable log, playback, compliance export)
 - ✅ Governance Cockpit (new tab with Trust Dashboard, Policy Center, Decision Queue, Audit Playback)
+- ✅ Metro Map Visualization (interactive pipeline map with stations, gates, train, pan/zoom, tooltips)
+- ✅ Dynamic Gate-to-Policy Coupling (gate tooltips read live from `PolicyEngine` descriptions)
 
 **Next:** Integration with live DQ feed (replace file drop with real-time API)
 
