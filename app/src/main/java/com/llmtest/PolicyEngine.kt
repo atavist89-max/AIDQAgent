@@ -12,6 +12,18 @@ object PolicyEngine {
 
     private val defaultPolicies = listOf(
         PolicyRule(
+            policyId = "critical_alert_oversight",
+            name = "Critical Alert Human Oversight",
+            description = "Critical severity alerts require coordinator approval regardless of Trust Score",
+            category = PolicyCategory.PROCESS,
+            isActive = true,
+            conditions = emptyList(),
+            action = PolicyAction.ESCALATE_TO_HUMAN,
+            escalationRequired = true,
+            gateLabel = "TRUST",
+            gateOrder = 0
+        ),
+        PolicyRule(
             policyId = "pii_prevention",
             name = "PII Exposure Prevention",
             description = "Blocks any output containing identifiable customer data patterns",
@@ -19,7 +31,9 @@ object PolicyEngine {
             isActive = true,
             conditions = emptyList(), // regex evaluated at runtime
             action = PolicyAction.REDACT_AND_LOG,
-            escalationRequired = false
+            escalationRequired = false,
+            gateLabel = "PII",
+            gateOrder = 1
         ),
         PolicyRule(
             policyId = "exec_contact_approval",
@@ -29,17 +43,9 @@ object PolicyEngine {
             isActive = true,
             conditions = emptyList(),
             action = PolicyAction.ESCALATE_TO_HUMAN,
-            escalationRequired = true
-        ),
-        PolicyRule(
-            policyId = "critical_alert_oversight",
-            name = "Critical Alert Human Oversight",
-            description = "Critical severity alerts require coordinator approval regardless of Trust Score",
-            category = PolicyCategory.PROCESS,
-            isActive = true,
-            conditions = emptyList(),
-            action = PolicyAction.ESCALATE_TO_HUMAN,
-            escalationRequired = true
+            escalationRequired = true,
+            gateLabel = "EXEC",
+            gateOrder = 2
         ),
         PolicyRule(
             policyId = "audit_trail_completeness",
@@ -49,7 +55,9 @@ object PolicyEngine {
             isActive = true,
             conditions = emptyList(),
             action = PolicyAction.BLOCK_AND_REQUEST_RETRY,
-            escalationRequired = false
+            escalationRequired = false,
+            gateLabel = "AUDIT",
+            gateOrder = 3
         ),
         PolicyRule(
             policyId = "schema_drift_validation",
@@ -59,7 +67,9 @@ object PolicyEngine {
             isActive = true,
             conditions = emptyList(),
             action = PolicyAction.BLOCK_AND_REQUEST_RETRY,
-            escalationRequired = false
+            escalationRequired = false,
+            gateLabel = "SCHEMA",
+            gateOrder = 4
         )
     )
 
@@ -99,6 +109,8 @@ object PolicyEngine {
     fun getPolicies(): List<PolicyRule> = ensureFile().policies
 
     fun getActivePolicies(): List<PolicyRule> = ensureFile().policies.filter { it.isActive }
+
+    fun getPolicy(policyId: String): PolicyRule? = ensureFile().policies.find { it.policyId == policyId }
 
     fun addPolicy(policy: PolicyRule) {
         val data = ensureFile()

@@ -3,6 +3,7 @@ package com.llmtest
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Shield
@@ -26,6 +27,7 @@ enum class GateState {
 fun MetroGate(
     label: String,
     state: GateState,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val borderColor = when (state) {
@@ -74,7 +76,8 @@ fun MetroGate(
                     color = borderColor,
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
                 )
-                .then(dashModifier),
+                .then(dashModifier)
+                .clickable { onClick() },
             contentAlignment = Alignment.Center
         ) {
             Icon(

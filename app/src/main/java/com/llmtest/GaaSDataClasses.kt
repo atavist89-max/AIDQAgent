@@ -63,6 +63,8 @@ data class PolicyRule(
     val conditions: List<PolicyCondition> = emptyList(),
     val action: PolicyAction,
     val escalationRequired: Boolean = false,
+    val gateLabel: String? = null,
+    val gateOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

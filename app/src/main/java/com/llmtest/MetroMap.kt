@@ -277,22 +277,38 @@ private fun MetroMapCanvas(
     var scale by remember { mutableStateOf(1f) }
     var offsetX by remember { mutableStateOf(0f) }
 
+    var activeTooltip by remember { mutableStateOf<TooltipInfo?>(null) }
+
     val stationDefs = listOf(
-        StationDef("STAGE 1", "Triage", "stage1", 120f),
-        StationDef("STAGE 2", "Context", "stage2", 320f),
-        StationDef("STAGE 3", "Pattern", "stage3", 520f),
-        StationDef("STAGE 4A", "Upstream", "stage4a", 720f),
-        StationDef("STAGE 4B", "Downstream", "stage4b", 920f),
-        StationDef("STAGE 4C", "Synthesis", "stage4c", 1120f)
+        StationDef("STAGE 1", "Triage", "stage1", 120f, "Initial severity assessment and alert classification using rule-based triage."),
+        StationDef("STAGE 2", "Context", "stage2", 320f, "Entity lookup and metadata enrichment from the data catalog."),
+        StationDef("STAGE 3", "Pattern", "stage3", 520f, "Anomaly detection and historical pattern matching against prior alerts."),
+        StationDef("STAGE 4A", "Upstream", "stage4a", 720f, "Technical root cause analysis tracing upstream data lineage."),
+        StationDef("STAGE 4B", "Downstream", "stage4b", 920f, "Business impact assessment tracing downstream report consumers."),
+        StationDef("STAGE 4C", "Synthesis", "stage4c", 1120f, "Executive narrative generation combining upstream and downstream findings.")
     )
 
-    val gateDefs = listOf(
-        GateDef("TRUST", 220f, 0),
-        GateDef("PII", 420f, 1),
-        GateDef("EXEC", 620f, 2),
-        GateDef("AUDIT", 820f, 3),
-        GateDef("SCHEMA", 1020f, 4)
-    )
+    val policies = remember { PolicyEngine.getActivePolicies() }
+    val gateDefs = remember(policies) {
+        policies
+            .filter { it.gateLabel != null }
+            .sortedBy { it.gateOrder }
+            .mapIndexed { index, policy ->
+                GateDef(
+                    label = policy.gateLabel!!,
+                    x = 220f + index * 200f,
+                    afterStation = index,
+                    policyId = policy.policyId
+                )
+            }
+    }
+
+    LaunchedEffect(activeTooltip) {
+        if (activeTooltip != null) {
+            delay(4000)
+            activeTooltip = null
+        }
+    }
 
     val centerY = 140f
     val trainX = remember(trainPosition) {
@@ -441,7 +457,14 @@ private fun MetroMapCanvas(
                         trustScore = trustScore,
                         state = state,
                         isFocused = false,
-                        onClick = { }
+                        onClick = {
+                            activeTooltip = TooltipInfo(
+                                title = "${def.label} — ${def.agentName}",
+                                description = def.description,
+                                itemX = def.x,
+                                itemY = centerY - 90f
+                            )
+                        }
                     )
                 }
             }
@@ -462,7 +485,35 @@ private fun MetroMapCanvas(
                     MetroGate(
                         label = gate.label,
                         state = if (stage > gate.afterStation) state else GateState.APPROVED,
+                        onClick = {
+                            val policyDesc = PolicyEngine.getPolicy(gate.policyId)?.description
+                            activeTooltip = TooltipInfo(
+                                title = "${gate.label} Gate",
+                                description = policyDesc ?: "Policy description unavailable",
+                                itemX = gate.x,
+                                itemY = centerY - 90f
+                            )
+                        },
                         modifier = Modifier
+                    )
+                }
+            }
+
+            // Tooltip overlay
+            activeTooltip?.let { tooltip ->
+                Box(
+                    modifier = Modifier
+                        .offset(
+                            x = (tooltip.itemX - 100f).dp.coerceAtLeast(0.dp),
+                            y = tooltip.itemY.dp.coerceAtLeast(4.dp)
+                        )
+                        .width(200.dp)
+                        .wrapContentHeight()
+                ) {
+                    TooltipCard(
+                        title = tooltip.title,
+                        description = tooltip.description,
+                        onDismiss = { activeTooltip = null }
                     )
                 }
             }
@@ -489,5 +540,63 @@ private fun MetroMapCanvas(
 }
 }
 
-private data class StationDef(val label: String, val agentName: String, val agentId: String, val x: Float)
-private data class GateDef(val label: String, val x: Float, val afterStation: Int)
+private data class StationDef(val label: String, val agentName: String, val agentId: String, val x: Float, val description: String)
+private data class GateDef(val label: String, val x: Float, val afterStation: Int, val policyId: String)
+
+private data class TooltipInfo(
+    val title: String,
+    val description: String,
+    val itemX: Float,
+    val itemY: Float
+)
+
+@Composable
+private fun TooltipCard(
+    title: String,
+    description: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFF1A1A2E),
+        shadowElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = "✕",
+                    fontSize = 14.sp,
+                    color = Color(0xFF9CA3AF),
+                    modifier = Modifier.clickable { onDismiss() }
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = description,
+                fontSize = 11.sp,
+                color = Color(0xFFD1D5DB),
+                lineHeight = 16.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Tap anywhere to dismiss",
+                fontSize = 9.sp,
+                color = Color(0xFF6B7280)
+            )
+        }
+    }
+}

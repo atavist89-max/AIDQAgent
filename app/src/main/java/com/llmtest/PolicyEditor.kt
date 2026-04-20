@@ -195,6 +195,7 @@ private fun CreatePolicyDialog(
     var conditionOp by remember { mutableStateOf("==") }
     var conditionValue by remember { mutableStateOf("") }
     var escalationRequired by remember { mutableStateOf(false) }
+    var gateLabel by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -203,6 +204,7 @@ private fun CreatePolicyDialog(
             Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Policy Name") }, singleLine = true)
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") })
+                OutlinedTextField(value = gateLabel, onValueChange = { gateLabel = it }, label = { Text("Gate Label (optional, e.g., PII, TRUST)") }, singleLine = true)
 
                 Text("Category", style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -252,7 +254,9 @@ private fun CreatePolicyDialog(
                             isActive = true,
                             conditions = conditions,
                             action = action,
-                            escalationRequired = escalationRequired
+                            escalationRequired = escalationRequired,
+                            gateLabel = gateLabel.takeIf { it.isNotBlank() },
+                            gateOrder = 99
                         )
                     )
                 },
@@ -275,6 +279,7 @@ private fun PolicyDetailDialog(
 ) {
     var name by remember { mutableStateOf(policy.name) }
     var description by remember { mutableStateOf(policy.description) }
+    var gateLabel by remember { mutableStateOf(policy.gateLabel ?: "") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -283,10 +288,11 @@ private fun PolicyDetailDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") })
+                OutlinedTextField(value = gateLabel, onValueChange = { gateLabel = it }, label = { Text("Gate Label (optional, e.g., PII, TRUST)") }, singleLine = true)
             }
         },
         confirmButton = {
-            TextButton(onClick = { onUpdate(policy.copy(name = name, description = description)) }) {
+            TextButton(onClick = { onUpdate(policy.copy(name = name, description = description, gateLabel = gateLabel.takeIf { it.isNotBlank() })) }) {
                 Text("Save")
             }
         },
