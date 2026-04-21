@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+
 package com.llmtest
 
 import androidx.compose.animation.*
@@ -19,7 +21,6 @@ import androidx.compose.ui.unit.sp
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun GovernanceScreen() {
     val scrollState = rememberScrollState()
@@ -327,7 +328,6 @@ private fun PolicyCard(
 
 // ==================== STAGE 1: TRIAGE DECISION MATRIX ====================
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Stage1ConfigCard(
     config: Stage1Config,
