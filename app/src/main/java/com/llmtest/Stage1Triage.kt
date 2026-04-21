@@ -8,16 +8,23 @@ object Stage1Triage {
     private val json = Json { ignoreUnknownKeys = true }
     
     fun run(alert: DQAlert): AnalysisState {
+        val config = GovernanceConfig.getStage1Config()
+        
         // Load reports to check downstream impact
         val reports = loadReports()
         val affectedReports = reports.filter { it.dataSources.contains(alert.datasetName) }
-        val hasExecutiveReport = affectedReports.any { it.reportClass == "2" }
+        val hasExecutiveReport = affectedReports.any { it.reportClass.toIntOrNull() ?: 0 >= config.requiredDownstreamClass }
         
-        // Decision logic
-        val decision = when (alert.severity) {
-            "Critical", "Error" -> "FULL_ANALYSIS"
-            "Warning" -> if (hasExecutiveReport) "FULL_ANALYSIS" else "MINIMAL"
-            "Informative" -> if (hasExecutiveReport) "FULL_ANALYSIS" else "MINIMAL"
+        // Severity ranking for comparison
+        val severityRank = mapOf("Informative" to 0, "Warning" to 1, "Error" to 2, "Critical" to 3)
+        val alertRank = severityRank[alert.severity] ?: 0
+        val thresholdRank = severityRank[config.severityThreshold] ?: 1
+        
+        // Decision logic driven by config
+        val decision = when {
+            alertRank >= thresholdRank -> "FULL_ANALYSIS"
+            hasExecutiveReport -> "FULL_ANALYSIS"
+            alert.dimension in config.dimensionBypass -> "FULL_ANALYSIS"
             else -> "MINIMAL"
         }
         
@@ -29,7 +36,7 @@ object Stage1Triage {
         
         // Save state to file
         GhostPaths.stateFile(1).writeText(json.encodeToString(AnalysisState.serializer(), state))
-        BugLogger.log("Stage 1 complete: $decision")
+        BugLogger.log("Stage 1 complete: $decision (threshold=${config.severityThreshold}, class>=${config.requiredDownstreamClass}, bypass=${config.dimensionBypass})")
         
         return state
     }

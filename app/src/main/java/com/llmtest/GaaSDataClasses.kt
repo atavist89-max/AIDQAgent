@@ -21,12 +21,40 @@ data class GaaSPoliciesFile(
 @Serializable
 data class StationPrompt(
     val stationId: String,
-    val prompt: String = ""
+    val prompt: String = "",
+    val configJson: String = ""
 )
 
 @Serializable
 data class StationPromptsFile(
     val stations: List<StationPrompt> = emptyList()
+)
+
+// ==================== STAGE CONFIGURATION MODELS ====================
+
+@Serializable
+data class Stage1Config(
+    val severityThreshold: String = "Warning",
+    val requiredDownstreamClass: Int = 2,
+    val dimensionBypass: List<String> = emptyList()
+)
+
+@Serializable
+data class Stage2Config(
+    val entityFields: List<String> = listOf("entityName", "entityGroup", "ownerEmail", "description"),
+    val catalogFields: List<String> = listOf("sourceDB", "sourceTable", "definition", "dataExample"),
+    val fallbackChain: List<String> = listOf("entityGroup", "ownerEmail", "datasetName"),
+    val maxCatalogColumns: Int = 5
+)
+
+@Serializable
+data class Stage3Config(
+    val ownerOverloadThreshold: Int = 2,
+    val ownerOverloadAnySeverityThreshold: Int = 5,
+    val lookbackWindowDays: Int = 7,
+    val groupHealthThreshold: Float = 0.6f,
+    val groupFailingDatasetMin: Int = 2,
+    val defaultIsolatedIncident: Boolean = true
 )
 
 // ==================== ATTEMPT RECORD FOR HUMAN INTERVENTION ====================
@@ -94,5 +122,3 @@ sealed class PostStageResult {
     object Allow : PostStageResult()
     data class NeedsReview(val prompt: String) : PostStageResult()
 }
-
-

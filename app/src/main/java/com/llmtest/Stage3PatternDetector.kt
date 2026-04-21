@@ -8,6 +8,8 @@ object Stage3PatternDetector {
     private val json = Json { ignoreUnknownKeys = true }
     
     fun run(alert: DQAlert, stage2State: AnalysisState): AnalysisState {
+        val config = GovernanceConfig.getStage3Config()
+        
         // Load all alerts to check owner workload
         val allAlerts = loadAlerts()
         val ownerFailures = allAlerts.filter { 
@@ -37,16 +39,16 @@ object Stage3PatternDetector {
         val groupTotal = groupAlerts.size
         val healthScore = if (groupTotal > 0) groupPassing.toFloat() / groupTotal else 1.0f
         
-        // Pattern detection
+        // Pattern detection using configurable thresholds
         val patternType = when {
-            ownerFailures.size > 2 -> "owner_overload"
-            healthScore < 0.6f -> "group_collapse"
-            else -> "isolated_incident"
+            ownerFailures.size > config.ownerOverloadThreshold -> "owner_overload"
+            healthScore < config.groupHealthThreshold -> "group_collapse"
+            else -> if (config.defaultIsolatedIncident) "isolated_incident" else "none"
         }
         
-        val pattern = when {
-            ownerFailures.size > 2 -> "owner_overload: ${ownerFailures.size} Critical/Error failures"
-            healthScore < 0.6f -> "group_collapse: ${(healthScore * 100).toInt()}% health"
+        val pattern = when (patternType) {
+            "owner_overload" -> "owner_overload: ${ownerFailures.size} Critical/Error failures"
+            "group_collapse" -> "group_collapse: ${(healthScore * 100).toInt()}% health"
             else -> "isolated_incident"
         }
         
@@ -68,7 +70,7 @@ object Stage3PatternDetector {
         )
         
         GhostPaths.stateFile(3).writeText(json.encodeToString(AnalysisState.serializer(), state))
-        BugLogger.log("Stage 3 complete: $pattern")
+        BugLogger.log("Stage 3 complete: $pattern (overloadThreshold=${config.ownerOverloadThreshold}, healthThreshold=${config.groupHealthThreshold})")
         
         return state
     }

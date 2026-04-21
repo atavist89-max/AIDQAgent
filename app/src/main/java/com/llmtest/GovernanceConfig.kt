@@ -20,15 +20,18 @@ object GovernanceConfig {
     private val defaultStationPrompts = listOf(
         StationPrompt(
             stationId = "stage1",
-            prompt = "Deterministic rule-based triage agent. Evaluate alert severity and downstream report impact to classify as FULL_ANALYSIS or MINIMAL."
+            prompt = "Deterministic rule-based triage agent. Evaluate alert severity and downstream report impact to classify as FULL_ANALYSIS or MINIMAL.",
+            configJson = json.encodeToString(Stage1Config.serializer(), Stage1Config())
         ),
         StationPrompt(
             stationId = "stage2",
-            prompt = "Deterministic context builder. Enrich alerts with entity metadata, catalog columns, and entity group information from the data catalog."
+            prompt = "Deterministic context builder. Enrich alerts with entity metadata, catalog columns, and entity group information from the data catalog.",
+            configJson = json.encodeToString(Stage2Config.serializer(), Stage2Config())
         ),
         StationPrompt(
             stationId = "stage3",
-            prompt = "Deterministic pattern detector. Analyze owner workload and group health to identify patterns: owner_overload, group_collapse, or isolated_incident."
+            prompt = "Deterministic pattern detector. Analyze owner workload and group health to identify patterns: owner_overload, group_collapse, or isolated_incident.",
+            configJson = json.encodeToString(Stage3Config.serializer(), Stage3Config())
         ),
         StationPrompt(
             stationId = "stage4a",
@@ -211,6 +214,31 @@ object GovernanceConfig {
         } catch (e: Exception) {
             BugLogger.logError("GovernanceConfig: Failed to persist station prompts", e)
         }
+    }
+
+    // ---------- Config Helpers ----------
+
+    inline fun <reified T> parseConfig(configJson: String): T? {
+        return try {
+            if (configJson.isNotBlank()) {
+                json.decodeFromString(serializer<T>(), configJson)
+            } else null
+        } catch (e: Exception) {
+            BugLogger.logError("GovernanceConfig: Failed to parse config", e)
+            null
+        }
+    }
+
+    fun getStage1Config(): Stage1Config {
+        return getStationPrompt("stage1")?.configJson?.let { parseConfig<Stage1Config>(it) } ?: Stage1Config()
+    }
+
+    fun getStage2Config(): Stage2Config {
+        return getStationPrompt("stage2")?.configJson?.let { parseConfig<Stage2Config>(it) } ?: Stage2Config()
+    }
+
+    fun getStage3Config(): Stage3Config {
+        return getStationPrompt("stage3")?.configJson?.let { parseConfig<Stage3Config>(it) } ?: Stage3Config()
     }
 
     // ---------- Block State ----------
