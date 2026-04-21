@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun AgentThoughtPanel(
     thought: AgentThought?,
+    stage: Int,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
     modifier: Modifier = Modifier
@@ -108,7 +109,7 @@ fun AgentThoughtPanel(
             if (thought != null) {
                 SingleAgentView(thought = thought, isExpanded = isExpanded)
             } else {
-                EmptyThoughtView()
+                EmptyThoughtView(stage = stage)
             }
         }
     }
@@ -238,7 +239,12 @@ private fun SingleAgentView(thought: AgentThought, isExpanded: Boolean) {
 }
 
 @Composable
-private fun EmptyThoughtView() {
+private fun EmptyThoughtView(stage: Int) {
+    val message = when {
+        stage >= 50 -> "Analysis complete. Tap a station to review findings."
+        stage > 0 -> "Processing..."
+        else -> "Waiting for pipeline to start..."
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -246,7 +252,7 @@ private fun EmptyThoughtView() {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "Waiting for pipeline to start...",
+            text = message,
             fontSize = 13.sp,
             color = Color(0xFF6B7280)
         )

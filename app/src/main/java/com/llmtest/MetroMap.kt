@@ -120,13 +120,14 @@ fun MetroMapScreen(
                 confidence = 0.82f,
                 isTyping = downstream.length < 100
             )
-            43, 50 -> AgentThought(
+            43 -> AgentThought(
                 agentId = "stage4c",
                 agentName = "Synthesizer",
                 agentRole = "Executive narrative",
-                reasoning = s4.take(400),
-                evidence = listOf("stage4a.json", "stage4b.json"),
-                confidence = 0.90f
+                reasoning = "Synthesizing upstream and downstream findings into executive briefing...",
+                evidence = emptyList(),
+                confidence = 0.0f,
+                isTyping = true
             )
             else -> null
         }
@@ -155,6 +156,42 @@ fun MetroMapScreen(
             dimension = "Adaptability",
             elapsedSeconds = elapsedSeconds,
             progressPercent = ((stage / 50f) * 100).toInt(),
+            upstreamReport = upstream,
+            downstreamReport = downstream,
+            synthesisReport = s4,
+            onViewReport = { agentId ->
+                val thought = when (agentId) {
+                    "stage4a" -> AgentThought(
+                        agentId = "stage4a",
+                        agentName = "Upstream Researcher",
+                        agentRole = "Technical root cause",
+                        reasoning = upstream,
+                        evidence = listOf("catalog_columns.json", "dq_knowledge.json"),
+                        confidence = 0.85f
+                    )
+                    "stage4b" -> AgentThought(
+                        agentId = "stage4b",
+                        agentName = "Downstream Researcher",
+                        agentRole = "Business impact",
+                        reasoning = downstream,
+                        evidence = listOf("reports.json", "dq_knowledge.json"),
+                        confidence = 0.82f
+                    )
+                    "stage4c" -> AgentThought(
+                        agentId = "stage4c",
+                        agentName = "Synthesizer",
+                        agentRole = "Executive narrative",
+                        reasoning = s4,
+                        evidence = listOf("stage4a.json", "stage4b.json"),
+                        confidence = 0.90f
+                    )
+                    else -> null
+                }
+                thought?.let {
+                    vm.setActiveAgentThought(it)
+                    isPanelExpanded = true
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -165,6 +202,7 @@ fun MetroMapScreen(
 
         AgentThoughtPanel(
             thought = thought,
+            stage = stage,
             isExpanded = isPanelExpanded,
             onToggleExpand = { isPanelExpanded = !isPanelExpanded },
             modifier = Modifier
@@ -206,6 +244,10 @@ private fun MetroMapCanvas(
     dimension: String,
     elapsedSeconds: Int,
     progressPercent: Int,
+    upstreamReport: String,
+    downstreamReport: String,
+    synthesisReport: String,
+    onViewReport: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -370,12 +412,16 @@ private fun MetroMapCanvas(
                         state = state,
                         isFocused = false,
                         onClick = {
-                            activeTooltip = TooltipInfo(
-                                title = "${def.label} — ${def.agentName}",
-                                description = def.description,
-                                itemX = def.x,
-                                itemY = centerY - 90f
-                            )
+                            if (def.agentId in listOf("stage4a", "stage4b", "stage4c") && state == StationState.COMPLETE) {
+                                onViewReport(def.agentId)
+                            } else {
+                                activeTooltip = TooltipInfo(
+                                    title = "${def.label} — ${def.agentName}",
+                                    description = def.description,
+                                    itemX = def.x,
+                                    itemY = centerY - 90f
+                                )
+                            }
                         }
                     )
                 }
