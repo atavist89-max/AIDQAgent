@@ -113,7 +113,7 @@ Between each stage is a configurable governance gate:
 ### On-Device Data Architecture
 
 ```
-/storage/emulated/0/Download/GhostModels/DQAgent/
+/storage/emulated/0/Download/GhostModels/DQAgent (GaaS)/
 ├── data/                      # Read-only reference data
 │   ├── dq_alerts.json         # 24 DQ checks (13 failing, 11 passing)
 │   ├── entities.json          # 23 business entities with definitions
@@ -270,7 +270,7 @@ The system consumes 5 integrated data sources:
 
 **Total demo time:** 3 minutes from creation to governance insight.
 
-**Alternative (file drop still works):** Drag `demo_alert.json` to `DQAgent/demo_input/` for scripted presentations.
+**Alternative (file drop still works):** Drag `demo_alert.json` to `DQAgent (GaaS)/demo_input/` for scripted presentations.
 
 ---
 
@@ -303,8 +303,8 @@ adb install app-debug.apk
 
 App requires `MANAGE_EXTERNAL_STORAGE` (Android 11+) to read:
 - LLM model from `/Download/GhostModels/`
-- DQ data files from `/Download/GhostModels/DQAgent/data/`
-- GaaS config files from `/Download/GhostModels/DQAgent/state/`
+- DQ data files from `/Download/GhostModels/DQAgent (GaaS)/data/`
+- GaaS config files from `/Download/GhostModels/DQAgent (GaaS)/state/`
 
 ---
 
