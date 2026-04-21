@@ -8,7 +8,7 @@ object GhostPaths {
     val MODEL_FILE = File(BASE_DIR, "gemma-4-e2b.litertlm")
     
     // DQ Agent paths (new)
-    val DQ_AGENT_DIR = File(BASE_DIR, "DQAgent\(GaaS\)")
+    val DQ_AGENT_DIR = File(BASE_DIR, "DQAgent(GaaS)")
     val DQ_DATA_DIR = File(DQ_AGENT_DIR, "data")
     val DQ_STATE_DIR = File(DQ_AGENT_DIR, "state")
     val DQ_INPUT_DIR = File(DQ_AGENT_DIR, "demo_input")
