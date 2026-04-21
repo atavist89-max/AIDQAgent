@@ -3,6 +3,7 @@ package com.llmtest
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,6 +54,13 @@ fun AgentThoughtPanel(
                     .clip(RoundedCornerShape(2.dp))
                     .background(Color(0xFFE5E7EB))
                     .align(Alignment.CenterHorizontally)
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures { _, dragAmount ->
+                            if (dragAmount > 30f && isExpanded) {
+                                onToggleExpand()
+                            }
+                        }
+                    }
             )
 
             Spacer(modifier = Modifier.height(12.dp))

@@ -87,7 +87,7 @@ fun MetroMapScreen(
             41 -> 3f
             42 -> 4f
             43 -> 5f
-            50 -> 5.5f
+            50 -> 6f
             else -> vm.trainPosition.value
         }
         vm.animateTrainTo(targetIndex, 800)
@@ -280,7 +280,8 @@ private fun MetroMapCanvas(
         StationDef("STAGE 3", "Pattern", "stage3", 520f, "Anomaly detection and historical pattern matching against prior alerts."),
         StationDef("STAGE 4A", "Upstream", "stage4a", 720f, "Technical root cause analysis tracing upstream data lineage."),
         StationDef("STAGE 4B", "Downstream", "stage4b", 920f, "Business impact assessment tracing downstream report consumers."),
-        StationDef("STAGE 4C", "Synthesis", "stage4c", 1120f, "Executive narrative generation combining upstream and downstream findings.")
+        StationDef("STAGE 4C", "Synthesis", "stage4c", 1120f, "Executive narrative generation combining upstream and downstream findings."),
+        StationDef("COMPLETE", "Done", "complete", 1320f, "Pipeline completed successfully. All stages finished.")
     )
 
     // Fixed 5 gates between the 6 stations
@@ -319,7 +320,7 @@ private fun MetroMapCanvas(
         modifier = modifier
     ) {
         val containerWidth = constraints.maxWidth.toFloat()
-        val contentWidthPx = with(density) { 1300.dp.toPx() }
+        val contentWidthPx = with(density) { 1500.dp.toPx() }
 
         Box(
             modifier = Modifier
@@ -336,7 +337,7 @@ private fun MetroMapCanvas(
         ) {
             Box(
                 modifier = Modifier
-                    .width(1300.dp)
+                    .width(1500.dp)
                     .height(280.dp)
                     .drawBehind {
                         // Dot grid background covering full content
@@ -404,7 +405,7 @@ private fun MetroMapCanvas(
             // Stations
             stationDefs.forEachIndexed { index, def ->
                 val state = when {
-                    stage == 50 && index < 6 -> StationState.COMPLETE
+                    stage == 50 && index < 7 -> StationState.COMPLETE
                     stage == 43 && index < 5 -> StationState.COMPLETE
                     stage == 42 && index < 4 -> StationState.COMPLETE
                     stage == 41 && index < 3 -> StationState.COMPLETE
@@ -416,6 +417,7 @@ private fun MetroMapCanvas(
                     stage == 41 && index == 3 -> StationState.ACTIVE
                     stage == 42 && index == 4 -> StationState.ACTIVE
                     stage == 43 && index == 5 -> StationState.ACTIVE
+                    stage == 50 && index == 6 -> StationState.ACTIVE
                     pipelineBlocked && index == (stage / 10) -> StationState.BLOCKED
                     else -> StationState.PENDING
                 }
