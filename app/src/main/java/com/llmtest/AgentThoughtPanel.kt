@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -54,8 +55,8 @@ fun AgentThoughtPanel(
                     .clip(RoundedCornerShape(2.dp))
                     .background(Color(0xFFE5E7EB))
                     .align(Alignment.CenterHorizontally)
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures { _, dragAmount ->
+                    .pointerInput(isExpanded) {
+                        detectVerticalDragGestures { change, dragAmount ->
                             if (dragAmount > 30f && isExpanded) {
                                 onToggleExpand()
                             }
