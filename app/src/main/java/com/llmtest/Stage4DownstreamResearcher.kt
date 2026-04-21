@@ -66,22 +66,22 @@ object Stage4DownstreamResearcher {
             appendLine(systemPrompt)
             appendLine()
             appendLine("=== AFFECTED REPORTS ===")
-            if (affectedReports.isNotEmpty()) {
-                affectedReports.forEach { r ->
+            val reportsToShow = affectedReports.take(5)
+            if (reportsToShow.isNotEmpty()) {
+                reportsToShow.forEach { r ->
                     val classDescription = when(r.reportClass) {
-                        "0" -> "Class 0 - Personal/unit level (operational monitoring, limited immediate impact)"
-                        "1" -> "Class 1 - Cross-unit decision-making (management reviews, planning, operational decisions)"
-                        "2" -> "Class 2 - Very Important Reports (board-level, regulatory, external reporting, highest significance)"
-                        else -> "Class ${r.reportClass} - Unknown classification"
+                        "0" -> "C0-Personal"
+                        "1" -> "C1-Cross-unit"
+                        "2" -> "C2-Executive"
+                        else -> "C${r.reportClass}"
                     }
-                    appendLine("- ${r.reportName}")
-                    appendLine("  Classification: $classDescription")
-                    appendLine("  Owner: ${r.reportOwner}")
-                    appendLine("  Description: ${r.reportDescription}")
-                    appendLine()
+                    appendLine("- ${r.reportName} [$classDescription] Owner:${r.reportOwner} Desc:${r.reportDescription.take(100)}")
+                }
+                if (affectedReports.size > 5) {
+                    appendLine("- ... and ${affectedReports.size - 5} more reports")
                 }
             } else {
-                appendLine("- No downstream reports identified (data silo)")
+                appendLine("- No downstream reports")
             }
             
             appendLine("=== FAILURE CONTEXT ===")
@@ -103,35 +103,21 @@ object Stage4DownstreamResearcher {
             }
             
             appendLine("=== INSTRUCTION ===")
-            appendLine("You are a Business Impact Analyst.")
-            appendLine("${alert.datasetName} is one of ${groupDatasets} datasets in ${entity?.entityGroup}.")
-            appendLine("Assess cascade risk across the ENTIRE group, not just this one dataset.")
-            appendLine("If ${entity?.entityGroup} degrades further, which downstream reports break first?")
-            appendLine("Prioritize Class 2 (Executive) reports that consume ANY dataset in this group.")
+            appendLine("Assess cascade risk across the ${entity?.entityGroup} group (${groupDatasets} datasets). Prioritize C2 Executive reports.")
             appendLine()
             
-            appendLine("=== YOUR TASK ===")
-            appendLine("Write a Business Impact Assessment (200-250 words) covering:")
-            appendLine()
-            appendLine("1. CASCADE ANALYSIS: Which reports break first? What's the dependency chain? (e.g., 'Class 2 Executive pulls from Class 1 Management which pulls from this dataset')")
-            appendLine()
-            appendLine("2. STAKEHOLDER NOTIFICATION PRIORITY by Class:")
-            appendLine("   - Class 2 (Very Important): Who must be warned BEFORE the next report run? (executive assistants, board prep teams, regulatory liaisons)")
-            appendLine("   - Class 1 (Cross-unit): Which decision-makers will see corrupted data in weekly reviews?")
-            appendLine("   - Class 0 (Unit-level): Operational teams who can work around it")
-            appendLine()
-            appendLine("3. BUSINESS CONSEQUENCE BY CLASS:")
-            appendLine("   - Class 2 failure: External implications? (regulatory miss? client reporting error? board credibility?)")
-            appendLine("   - Class 1 failure: Internal planning impact? (wrong decisions based on bad data?)")
-            appendLine("   - Class 0 failure: Operational friction? (manual workarounds required?)")
-            appendLine()
-            appendLine("4. TIME SENSITIVITY: When do these reports run? Daily/weekly/monthly? How many hours before the next critical run?")
+            appendLine("=== TASK ===")
+            appendLine("Business Impact Assessment (200-250 words):")
+            appendLine("1. CASCADE: Which reports break first? Dependency chain?")
+            appendLine("2. STAKEHOLDERS: C2 (exec/board/regulatory), C1 (cross-unit decisions), C0 (ops teams)")
+            appendLine("3. CONSEQUENCES: External/regulatory, internal planning, operational friction")
+            appendLine("4. TIME: Report run frequency, hours until next critical run")
             appendLine()
             appendLine("RULES:")
-            appendLine("- Use actual report names and owner names from the data")
-            appendLine("- Be specific about who gets notified and why")
-            appendLine("- 200-250 words, professional impact assessment format")
-            appendLine("- Prioritize Class 2 above all—flag immediate escalation needs")
+            appendLine("- Use actual report/owner names from data")
+            appendLine("- Be specific about who gets notified")
+            appendLine("- 200-250 words, professional format")
+            appendLine("- Prioritize C2 — flag immediate escalation")
 
             // Append raw previous stage outputs if selected
             if ("stage1.json" in config.availableJsons) {
@@ -238,7 +224,7 @@ object Stage4DownstreamResearcher {
             if (file.exists()) {
                 appendLine()
                 appendLine("=== $label RAW OUTPUT ===")
-                appendLine(file.readText())
+                appendLine(file.readText().take(500))
             }
         } catch (_: Exception) { }
     }

@@ -64,18 +64,16 @@ object Stage4UpstreamResearcher {
             appendLine("Dataset: ${alert.datasetName}")
             appendLine("Source System: ${alert.datasourceName} (${alert.datasourceType})")
             if (primaryColumn != null) {
-                appendLine("Database: ${primaryColumn.sourceDB}")
-                appendLine("Table: ${primaryColumn.sourceTable}")
+                appendLine("DB.Table: ${primaryColumn.sourceDB}.${primaryColumn.sourceTable}")
                 appendLine("Column: ${primaryColumn.name}")
-                appendLine("Business Definition: ${primaryColumn.definition}")
+                appendLine("Definition: ${primaryColumn.definition?.take(100) ?: "N/A"}")
             }
             appendLine()
             
             if ("entities.json" in config.availableJsons) {
                 appendLine("=== ENTITY CONTEXT ===")
-                appendLine("Entity Name: ${entity?.entityName ?: "Unknown"}")
-                appendLine("Entity Group: ${entity?.entityGroup ?: "Unknown"}")
-                appendLine("Description: ${entity?.description ?: "No description available"}")
+                appendLine("Name: ${entity?.entityName ?: "Unknown"} | Group: ${entity?.entityGroup ?: "Unknown"}")
+                appendLine("Desc: ${entity?.description?.take(100) ?: "N/A"}")
                 appendLine()
             }
             
@@ -98,31 +96,22 @@ object Stage4UpstreamResearcher {
             }
             
             appendLine("=== INSTRUCTION ===")
-            appendLine("You are investigating a Technical Data Architect.")
-            appendLine("This dataset belongs to the ${entity?.entityGroup} business function.")
-            appendLine("Analyze ${alert.datasourceName} as infrastructure supporting ${groupDatasets} datasets in this group.")
-            appendLine("If this is a source system failure, estimate how many other group datasets are at risk.")
-            appendLine("Do not treat this as an isolated table failure — assess group-wide technical impact.")
+            appendLine("Analyze ${alert.datasourceName} as infrastructure for ${groupDatasets} datasets in ${entity?.entityGroup}. Assess group-wide technical impact, not isolated failure.")
             appendLine()
             
-            appendLine("=== YOUR TASK ===")
-            appendLine("Write a Technical Data Steward Briefing (200-250 words) covering:")
-            appendLine()
-            appendLine("1. BUSINESS PURPOSE: What is this data? What business process depends on it? Why does this entity/column exist?")
-            appendLine()
-            appendLine("2. TECHNICAL ARCHITECTURE: Analyze ${alert.datasourceName} as a source system. What are typical failure patterns for ${alert.datasourceType} systems? Reliability considerations.")
-            appendLine()
-            appendLine("3. DIMENSION CONTEXT: What does '${alert.dimension}' specifically mean for THIS dataset? Contextualize the risk (not generic definition).")
-            appendLine()
-            appendLine("4. ROOT CAUSE HYPOTHESIS: Based on source system (${alert.datasourceName}) and check type (${alert.checkName}), what is the most likely technical cause? Schema drift? API change? ETL timing issue? State confidence level.")
-            appendLine()
-            appendLine("5. INVESTIGATION PATH: Specific technical steps to confirm hypothesis (SQL queries, system checks, validation steps).")
+            appendLine("=== TASK ===")
+            appendLine("Technical Data Steward Briefing (200-250 words):")
+            appendLine("1. BUSINESS PURPOSE: What process depends on this data?")
+            appendLine("2. TECHNICAL ARCHITECTURE: Typical ${alert.datasourceType} failure patterns, reliability")
+            appendLine("3. DIMENSION CONTEXT: What does '${alert.dimension}' mean for THIS dataset?")
+            appendLine("4. ROOT CAUSE: Most likely cause (schema drift, API change, ETL issue)? Confidence level.")
+            appendLine("5. INVESTIGATION: SQL queries, system checks, validation steps")
             appendLine()
             appendLine("RULES:")
-            appendLine("- Use actual system names, table names, and database names provided in the data")
-            appendLine("- Be specific and technical but explain business relevance")
-            appendLine("- 200-250 words, professional technical briefing format")
-            appendLine("- Do not hedge—state conclusions with confidence levels")
+            appendLine("- Use actual system/table/DB names from data")
+            appendLine("- Be specific and technical")
+            appendLine("- 200-250 words, professional format")
+            appendLine("- State conclusions with confidence")
 
             // Append raw previous stage outputs if selected
             if ("stage1.json" in config.availableJsons) {
@@ -217,7 +206,7 @@ object Stage4UpstreamResearcher {
             if (file.exists()) {
                 appendLine()
                 appendLine("=== $label RAW OUTPUT ===")
-                appendLine(file.readText())
+                appendLine(file.readText().take(500))
             }
         } catch (_: Exception) { }
     }

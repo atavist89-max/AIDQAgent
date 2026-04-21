@@ -71,11 +71,11 @@ object Stage4Synthesizer {
             appendLine()
             appendLine("You have received two specialist research reports:")
             appendLine()
-            appendLine("=== TECHNICAL ANALYSIS (from Upstream Researcher) ===")
-            appendLine(stage4a.upstreamReport.take(800)) // Truncate if too long
+            appendLine("=== TECHNICAL ANALYSIS ===")
+            appendLine(stage4a.upstreamReport.take(400))
             appendLine()
-            appendLine("=== BUSINESS IMPACT ANALYSIS (from Downstream Researcher) ===")
-            appendLine(stage4b.downstreamReport.take(800)) // Truncate if too long
+            appendLine("=== BUSINESS IMPACT ===")
+            appendLine(stage4b.downstreamReport.take(400))
             appendLine()
             
             if ("entities.json" in config.availableJsons || "catalog_columns.json" in config.availableJsons || "reports.json" in config.availableJsons || "dq_alerts.json" in config.availableJsons) {
@@ -89,19 +89,17 @@ object Stage4Synthesizer {
             }
             
             appendLine("=== INSTRUCTION ===")
-            appendLine("You are a Senior Data Steward briefing the CDO.")
-            appendLine("Synthesize cross-layer risk: connect technical root cause → business function → organizational capacity.")
-            appendLine("Structure your narrative:")
+            appendLine("Synthesize cross-layer risk for CDO: technical root cause → business function → organizational capacity.")
+            appendLine()
+            appendLine("STRUCTURE:")
             appendLine("1. SITUATION: What broke and why it matters NOW")
             appendLine("2. TECHNICAL ROOT CAUSE: Source system failure with confidence")
-            appendLine("3. BUSINESS IMPACT: ${entity?.entityGroup} function degrading (${groupDatasets} datasets, ${groupTotal - groupPassing} failing)")
-            appendLine("4. ORGANIZATIONAL RISK: ${group?.ownerEmail} capacity with multiple concurrent failures")
-            appendLine("5. CASCADING THREAT: Predict next 24-48 hours if unresolved")
-            appendLine("6. ACTIONABLE RECOMMENDATIONS: Immediate, short-term, governance")
+            appendLine("3. BUSINESS IMPACT: ${entity?.entityGroup} degrading (${groupDatasets} datasets, ${groupTotal - groupPassing} failing)")
+            appendLine("4. ORGANIZATIONAL RISK: ${group?.ownerEmail} capacity")
+            appendLine("5. CASCADING THREAT: Next 24-48h if unresolved")
+            appendLine("6. RECOMMENDATIONS: Immediate, short-term, governance")
             appendLine()
-            
-            appendLine("TONE: Urgent but authoritative. Expert investigator briefing leadership. No hedging—state conclusions.")
-            appendLine("Use actual names from the research reports. Make it feel like a senior steward who investigated for 2 hours.")
+            appendLine("TONE: Urgent, authoritative. No hedging.")
 
             // Append raw previous stage outputs if selected
             if ("stage1.json" in config.availableJsons) {
@@ -244,7 +242,7 @@ object Stage4Synthesizer {
             if (file.exists()) {
                 appendLine()
                 appendLine("=== $label RAW OUTPUT ===")
-                appendLine(file.readText())
+                appendLine(file.readText().take(500))
             }
         } catch (_: Exception) { }
     }
