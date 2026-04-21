@@ -44,6 +44,22 @@ fun MetroMapScreen(
     val blockState by GaaSController.blockState.collectAsState()
     val humanInterventionRequired by GaaSController.humanInterventionRequired.collectAsState()
 
+    // Load agent display names from governance config
+    val stationPrompts = remember { GovernanceConfig.loadStationPrompts() }
+    val agentNames = remember(stationPrompts) {
+        val defaults = mapOf(
+            "stage1" to "Triage Agent",
+            "stage2" to "Context Builder",
+            "stage3" to "Pattern Detector",
+            "stage4a" to "Upstream Researcher",
+            "stage4b" to "Downstream Researcher",
+            "stage4c" to "Synthesizer"
+        )
+        defaults.mapValues { (id, fallback) ->
+            stationPrompts.find { it.stationId == id }?.agentName?.ifBlank { fallback } ?: fallback
+        }
+    }
+
     var isPanelExpanded by remember { mutableStateOf(false) }
     var elapsedSeconds by remember { mutableStateOf(0) }
 
@@ -80,7 +96,7 @@ fun MetroMapScreen(
         val thought = when (stage) {
             1 -> AgentThought(
                 agentId = "stage1",
-                agentName = "Triage Agent",
+                agentName = agentNames["stage1"] ?: "Triage Agent",
                 agentRole = "Severity assessment",
                 reasoning = s1,
                 evidence = listOf("reports.json"),
@@ -88,7 +104,7 @@ fun MetroMapScreen(
             )
             2 -> AgentThought(
                 agentId = "stage2",
-                agentName = "Context Builder",
+                agentName = agentNames["stage2"] ?: "Context Builder",
                 agentRole = "Entity lookup",
                 reasoning = s2,
                 evidence = listOf("entities.json", "catalog_columns.json"),
@@ -96,7 +112,7 @@ fun MetroMapScreen(
             )
             3 -> AgentThought(
                 agentId = "stage3",
-                agentName = "Pattern Detector",
+                agentName = agentNames["stage3"] ?: "Pattern Detector",
                 agentRole = "Anomaly detection",
                 reasoning = s3,
                 evidence = listOf("dq_alerts.json", "entities.json"),
@@ -104,7 +120,7 @@ fun MetroMapScreen(
             )
             41 -> AgentThought(
                 agentId = "stage4a",
-                agentName = "Upstream Researcher",
+                agentName = agentNames["stage4a"] ?: "Upstream Researcher",
                 agentRole = "Technical root cause",
                 reasoning = upstream.take(300),
                 evidence = listOf("catalog_columns.json", "dq_knowledge.json"),
@@ -113,7 +129,7 @@ fun MetroMapScreen(
             )
             42 -> AgentThought(
                 agentId = "stage4b",
-                agentName = "Downstream Researcher",
+                agentName = agentNames["stage4b"] ?: "Downstream Researcher",
                 agentRole = "Business impact",
                 reasoning = downstream.take(300),
                 evidence = listOf("reports.json", "dq_knowledge.json"),
@@ -122,7 +138,7 @@ fun MetroMapScreen(
             )
             43 -> AgentThought(
                 agentId = "stage4c",
-                agentName = "Synthesizer",
+                agentName = agentNames["stage4c"] ?: "Synthesizer",
                 agentRole = "Executive narrative",
                 reasoning = "Synthesizing upstream and downstream findings into executive briefing...",
                 evidence = emptyList(),
@@ -159,6 +175,7 @@ fun MetroMapScreen(
             upstreamReport = upstream,
             downstreamReport = downstream,
             synthesisReport = s4,
+            agentNames = agentNames,
             onViewReport = { agentId ->
                 val thought = when (agentId) {
                     "stage4a" -> AgentThought(
@@ -247,6 +264,7 @@ private fun MetroMapCanvas(
     upstreamReport: String,
     downstreamReport: String,
     synthesisReport: String,
+    agentNames: Map<String, String>,
     onViewReport: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -406,9 +424,10 @@ private fun MetroMapCanvas(
                     modifier = Modifier
                         .offset(x = def.x.dp - 28.dp, y = (centerY - 28f).dp)
                 ) {
+                    val displayName = agentNames[def.agentId] ?: def.agentName
                     MetroStation(
                         label = def.label,
-                        agentName = def.agentName,
+                        agentName = displayName,
                         state = state,
                         isFocused = false,
                         onClick = {
@@ -416,7 +435,7 @@ private fun MetroMapCanvas(
                                 onViewReport(def.agentId)
                             } else {
                                 activeTooltip = TooltipInfo(
-                                    title = "${def.label} — ${def.agentName}",
+                                    title = "${def.label} — $displayName",
                                     description = def.description,
                                     itemX = def.x,
                                     itemY = centerY - 90f

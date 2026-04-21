@@ -22,7 +22,8 @@ data class GaaSPoliciesFile(
 data class StationPrompt(
     val stationId: String,
     val prompt: String = "",
-    val configJson: String = ""
+    val configJson: String = "",
+    val agentName: String = ""
 )
 
 @Serializable

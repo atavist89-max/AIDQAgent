@@ -21,20 +21,24 @@ object GovernanceConfig {
         StationPrompt(
             stationId = "stage1",
             prompt = "Deterministic rule-based triage agent. Evaluate alert severity and downstream report impact to classify as FULL_ANALYSIS or MINIMAL.",
-            configJson = json.encodeToString(Stage1Config.serializer(), Stage1Config())
+            configJson = json.encodeToString(Stage1Config.serializer(), Stage1Config()),
+            agentName = "Triage Agent"
         ),
         StationPrompt(
             stationId = "stage2",
             prompt = "Deterministic context builder. Enrich alerts with entity metadata, catalog columns, and entity group information from the data catalog.",
-            configJson = json.encodeToString(Stage2Config.serializer(), Stage2Config())
+            configJson = json.encodeToString(Stage2Config.serializer(), Stage2Config()),
+            agentName = "Context Builder"
         ),
         StationPrompt(
             stationId = "stage3",
             prompt = "Deterministic pattern detector. Analyze owner workload and group health to identify patterns: owner_overload, group_collapse, or isolated_incident.",
-            configJson = json.encodeToString(Stage3Config.serializer(), Stage3Config())
+            configJson = json.encodeToString(Stage3Config.serializer(), Stage3Config()),
+            agentName = "Pattern Detector"
         ),
         StationPrompt(
             stationId = "stage4a",
+            agentName = "Upstream Researcher",
             prompt = buildString {
                 appendLine("You are a Technical Data Architect investigating a data quality failure in a financial institution.")
                 appendLine()
@@ -60,6 +64,7 @@ object GovernanceConfig {
         ),
         StationPrompt(
             stationId = "stage4b",
+            agentName = "Downstream Researcher",
             prompt = buildString {
                 appendLine("You are a Business Impact Analyst assessing downstream consequences of a data quality failure in a financial institution.")
                 appendLine()
@@ -89,6 +94,7 @@ object GovernanceConfig {
         ),
         StationPrompt(
             stationId = "stage4c",
+            agentName = "Synthesizer",
             prompt = buildString {
                 appendLine("You are a Senior Data Steward delivering an executive briefing to the Chief Data Officer.")
                 appendLine()

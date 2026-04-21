@@ -134,10 +134,14 @@ fun GovernanceScreen() {
             GovernanceConfig.parseConfig(stage1Prompt.configJson, Stage1Config.serializer()) ?: Stage1Config()
         }
         Stage1ConfigCard(
+            agentName = stage1Prompt.agentName.ifBlank { "Triage Agent" },
             config = stage1Config,
             availableDimensions = availableDimensions,
-            onSave = { newConfig ->
-                val updated = stage1Prompt.copy(configJson = Json.encodeToString(Stage1Config.serializer(), newConfig))
+            onSave = { newAgentName, newConfig ->
+                val updated = stage1Prompt.copy(
+                    agentName = newAgentName,
+                    configJson = Json.encodeToString(Stage1Config.serializer(), newConfig)
+                )
                 GovernanceConfig.updateStationPrompt(updated)
                 stationPrompts.value = GovernanceConfig.loadStationPrompts()
             }
@@ -149,9 +153,13 @@ fun GovernanceScreen() {
             GovernanceConfig.parseConfig(stage2Prompt.configJson, Stage2Config.serializer()) ?: Stage2Config()
         }
         Stage2ConfigCard(
+            agentName = stage2Prompt.agentName.ifBlank { "Context Builder" },
             config = stage2Config,
-            onSave = { newConfig ->
-                val updated = stage2Prompt.copy(configJson = Json.encodeToString(Stage2Config.serializer(), newConfig))
+            onSave = { newAgentName, newConfig ->
+                val updated = stage2Prompt.copy(
+                    agentName = newAgentName,
+                    configJson = Json.encodeToString(Stage2Config.serializer(), newConfig)
+                )
                 GovernanceConfig.updateStationPrompt(updated)
                 stationPrompts.value = GovernanceConfig.loadStationPrompts()
             }
@@ -163,9 +171,13 @@ fun GovernanceScreen() {
             GovernanceConfig.parseConfig(stage3Prompt.configJson, Stage3Config.serializer()) ?: Stage3Config()
         }
         Stage3ConfigCard(
+            agentName = stage3Prompt.agentName.ifBlank { "Pattern Detector" },
             config = stage3Config,
-            onSave = { newConfig ->
-                val updated = stage3Prompt.copy(configJson = Json.encodeToString(Stage3Config.serializer(), newConfig))
+            onSave = { newAgentName, newConfig ->
+                val updated = stage3Prompt.copy(
+                    agentName = newAgentName,
+                    configJson = Json.encodeToString(Stage3Config.serializer(), newConfig)
+                )
                 GovernanceConfig.updateStationPrompt(updated)
                 stationPrompts.value = GovernanceConfig.loadStationPrompts()
             }
@@ -177,11 +189,13 @@ fun GovernanceScreen() {
             GovernanceConfig.parseConfig(stage4aPrompt.configJson, Stage4aConfig.serializer()) ?: Stage4aConfig()
         }
         Stage4aConfigCard(
+            agentName = stage4aPrompt.agentName.ifBlank { "Upstream Researcher" },
             prompt = stage4aPrompt.prompt,
             config = stage4aConfig,
-            onSave = { newPrompt, newConfig ->
+            onSave = { newAgentName, newPrompt, newConfig ->
                 val updated = StationPrompt(
                     stationId = "stage4a",
+                    agentName = newAgentName,
                     prompt = newPrompt,
                     configJson = Json.encodeToString(Stage4aConfig.serializer(), newConfig)
                 )
@@ -196,11 +210,13 @@ fun GovernanceScreen() {
             GovernanceConfig.parseConfig(stage4bPrompt.configJson, Stage4bConfig.serializer()) ?: Stage4bConfig()
         }
         Stage4bConfigCard(
+            agentName = stage4bPrompt.agentName.ifBlank { "Downstream Researcher" },
             prompt = stage4bPrompt.prompt,
             config = stage4bConfig,
-            onSave = { newPrompt, newConfig ->
+            onSave = { newAgentName, newPrompt, newConfig ->
                 val updated = StationPrompt(
                     stationId = "stage4b",
+                    agentName = newAgentName,
                     prompt = newPrompt,
                     configJson = Json.encodeToString(Stage4bConfig.serializer(), newConfig)
                 )
@@ -215,11 +231,13 @@ fun GovernanceScreen() {
             GovernanceConfig.parseConfig(stage4cPrompt.configJson, Stage4cConfig.serializer()) ?: Stage4cConfig()
         }
         Stage4cConfigCard(
+            agentName = stage4cPrompt.agentName.ifBlank { "Synthesizer" },
             prompt = stage4cPrompt.prompt,
             config = stage4cConfig,
-            onSave = { newPrompt, newConfig ->
+            onSave = { newAgentName, newPrompt, newConfig ->
                 val updated = StationPrompt(
                     stationId = "stage4c",
+                    agentName = newAgentName,
                     prompt = newPrompt,
                     configJson = Json.encodeToString(Stage4cConfig.serializer(), newConfig)
                 )
@@ -405,10 +423,12 @@ private fun PolicyCard(
 
 @Composable
 private fun Stage1ConfigCard(
+    agentName: String,
     config: Stage1Config,
     availableDimensions: List<String>,
-    onSave: (Stage1Config) -> Unit
+    onSave: (String, Stage1Config) -> Unit
 ) {
+    var agentNameText by remember { mutableStateOf(agentName) }
     var severityThreshold by remember { mutableStateOf(config.severityThreshold) }
     var requiredDownstreamClass by remember { mutableIntStateOf(config.requiredDownstreamClass) }
     var dimensionBypass by remember { mutableStateOf(config.dimensionBypass.toSet()) }
@@ -451,6 +471,18 @@ private fun Stage1ConfigCard(
 
             AnimatedVisibility(visible = expanded) {
                 Column {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Agent name
+                    OutlinedTextField(
+                        value = agentNameText,
+                        onValueChange = { agentNameText = it },
+                        label = { Text("Agent Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Severity threshold dropdown
@@ -553,6 +585,7 @@ private fun Stage1ConfigCard(
                     Button(
                         onClick = {
                             onSave(
+                                agentNameText,
                                 Stage1Config(
                                     severityThreshold = severityThreshold,
                                     requiredDownstreamClass = requiredDownstreamClass,
@@ -575,9 +608,11 @@ private fun Stage1ConfigCard(
 
 @Composable
 private fun Stage2ConfigCard(
+    agentName: String,
     config: Stage2Config,
-    onSave: (Stage2Config) -> Unit
+    onSave: (String, Stage2Config) -> Unit
 ) {
+    var agentNameText by remember { mutableStateOf(agentName) }
     var entityFields by remember { mutableStateOf(config.entityFields.toSet()) }
     var catalogFields by remember { mutableStateOf(config.catalogFields.toSet()) }
     var fallbackChain by remember { mutableStateOf(config.fallbackChain.toMutableList()) }
@@ -621,6 +656,18 @@ private fun Stage2ConfigCard(
 
             AnimatedVisibility(visible = expanded) {
                 Column {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Agent name
+                    OutlinedTextField(
+                        value = agentNameText,
+                        onValueChange = { agentNameText = it },
+                        label = { Text("Agent Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Entity fields
@@ -740,6 +787,7 @@ private fun Stage2ConfigCard(
                     Button(
                         onClick = {
                             onSave(
+                                agentNameText,
                                 Stage2Config(
                                     entityFields = entityFields.toList(),
                                     catalogFields = catalogFields.toList(),
@@ -763,9 +811,11 @@ private fun Stage2ConfigCard(
 
 @Composable
 private fun Stage3ConfigCard(
+    agentName: String,
     config: Stage3Config,
-    onSave: (Stage3Config) -> Unit
+    onSave: (String, Stage3Config) -> Unit
 ) {
+    var agentNameText by remember { mutableStateOf(agentName) }
     var ownerOverloadThreshold by remember { mutableIntStateOf(config.ownerOverloadThreshold) }
     var ownerOverloadAnySeverityThreshold by remember { mutableIntStateOf(config.ownerOverloadAnySeverityThreshold) }
     var lookbackWindowDays by remember { mutableIntStateOf(config.lookbackWindowDays) }
@@ -808,6 +858,18 @@ private fun Stage3ConfigCard(
 
             AnimatedVisibility(visible = expanded) {
                 Column {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Agent name
+                    OutlinedTextField(
+                        value = agentNameText,
+                        onValueChange = { agentNameText = it },
+                        label = { Text("Agent Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Owner Overload card
@@ -932,6 +994,7 @@ private fun Stage3ConfigCard(
                     Button(
                         onClick = {
                             onSave(
+                                agentNameText,
                                 Stage3Config(
                                     ownerOverloadThreshold = ownerOverloadThreshold,
                                     ownerOverloadAnySeverityThreshold = ownerOverloadAnySeverityThreshold,
@@ -957,10 +1020,12 @@ private fun Stage3ConfigCard(
 
 @Composable
 private fun Stage4aConfigCard(
+    agentName: String,
     prompt: String,
     config: Stage4aConfig,
-    onSave: (String, Stage4aConfig) -> Unit
+    onSave: (String, String, Stage4aConfig) -> Unit
 ) {
+    var agentNameText by remember { mutableStateOf(agentName) }
     var promptText by remember(prompt) { mutableStateOf(prompt) }
     var availableJsons by remember { mutableStateOf(config.availableJsons.toSet()) }
 
@@ -985,6 +1050,17 @@ private fun Stage4aConfigCard(
                     color = Color(0xFF1A1A2E)
                 )
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = agentNameText,
+                onValueChange = { agentNameText = it },
+                label = { Text("Agent Name") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(8.dp)
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -1016,7 +1092,7 @@ private fun Stage4aConfigCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
-                onClick = { onSave(promptText, Stage4aConfig(availableJsons = availableJsons.toList())) },
+                onClick = { onSave(agentNameText, promptText, Stage4aConfig(availableJsons = availableJsons.toList())) },
                 modifier = Modifier.align(Alignment.End)
             ) {
                 Text("Save")
@@ -1029,10 +1105,12 @@ private fun Stage4aConfigCard(
 
 @Composable
 private fun Stage4bConfigCard(
+    agentName: String,
     prompt: String,
     config: Stage4bConfig,
-    onSave: (String, Stage4bConfig) -> Unit
+    onSave: (String, String, Stage4bConfig) -> Unit
 ) {
+    var agentNameText by remember { mutableStateOf(agentName) }
     var promptText by remember(prompt) { mutableStateOf(prompt) }
     var availableJsons by remember { mutableStateOf(config.availableJsons.toSet()) }
 
@@ -1057,6 +1135,17 @@ private fun Stage4bConfigCard(
                     color = Color(0xFF1A1A2E)
                 )
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = agentNameText,
+                onValueChange = { agentNameText = it },
+                label = { Text("Agent Name") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(8.dp)
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -1088,7 +1177,7 @@ private fun Stage4bConfigCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
-                onClick = { onSave(promptText, Stage4bConfig(availableJsons = availableJsons.toList())) },
+                onClick = { onSave(agentNameText, promptText, Stage4bConfig(availableJsons = availableJsons.toList())) },
                 modifier = Modifier.align(Alignment.End)
             ) {
                 Text("Save")
@@ -1101,10 +1190,12 @@ private fun Stage4bConfigCard(
 
 @Composable
 private fun Stage4cConfigCard(
+    agentName: String,
     prompt: String,
     config: Stage4cConfig,
-    onSave: (String, Stage4cConfig) -> Unit
+    onSave: (String, String, Stage4cConfig) -> Unit
 ) {
+    var agentNameText by remember { mutableStateOf(agentName) }
     var promptText by remember(prompt) { mutableStateOf(prompt) }
     var availableJsons by remember { mutableStateOf(config.availableJsons.toSet()) }
 
@@ -1129,6 +1220,17 @@ private fun Stage4cConfigCard(
                     color = Color(0xFF1A1A2E)
                 )
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = agentNameText,
+                onValueChange = { agentNameText = it },
+                label = { Text("Agent Name") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(8.dp)
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -1160,7 +1262,7 @@ private fun Stage4cConfigCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
-                onClick = { onSave(promptText, Stage4cConfig(availableJsons = availableJsons.toList())) },
+                onClick = { onSave(agentNameText, promptText, Stage4cConfig(availableJsons = availableJsons.toList())) },
                 modifier = Modifier.align(Alignment.End)
             ) {
                 Text("Save")
