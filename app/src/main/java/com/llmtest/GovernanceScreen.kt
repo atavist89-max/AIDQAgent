@@ -21,6 +21,45 @@ import androidx.compose.ui.unit.sp
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
+/** Returns all on-device JSONs + previous stage outputs available for a given stage. */
+fun getAvailableJsonsForStage(stageId: String): List<String> {
+    val onDevice = listOf(
+        "dq_alerts.json", "entities.json", "entity_groups.json",
+        "catalog_columns.json", "reports.json", "dq_knowledge.json"
+    )
+    val previousOutputs = when (stageId) {
+        "stage1" -> emptyList()
+        "stage2" -> listOf("stage1.json")
+        "stage3" -> listOf("stage1.json", "stage2.json")
+        "stage4a" -> listOf("stage1.json", "stage2.json", "stage3.json")
+        "stage4b" -> listOf("stage1.json", "stage2.json", "stage3.json", "stage4a.json")
+        "stage4c" -> listOf("stage1.json", "stage2.json", "stage3.json", "stage4a.json", "stage4b.json")
+        else -> emptyList()
+    }
+    return onDevice + previousOutputs
+}
+
+@Composable
+fun JsonSelectorChips(
+    selected: Set<String>,
+    options: List<String>,
+    onToggle: (String) -> Unit
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        options.forEach { file ->
+            val isSelected = selected.contains(file)
+            FilterChip(
+                selected = isSelected,
+                onClick = { onToggle(file) },
+                label = { Text(file, fontSize = 11.sp) }
+            )
+        }
+    }
+}
+
 @Composable
 fun GovernanceScreen() {
     val scrollState = rememberScrollState()
@@ -132,26 +171,62 @@ fun GovernanceScreen() {
             }
         )
 
-        // Stages 4A, 4B, 4C: Prompt-only cards
-        val llmStationDefs = listOf(
-            Triple("stage4a", "Stage 4A Upstream Researcher", Icons.Default.Build),
-            Triple("stage4b", "Stage 4B Downstream Researcher", Icons.Default.Assessment),
-            Triple("stage4c", "Stage 4C Synthesizer", Icons.Default.Article)
+        // Stage 4A: Upstream Researcher
+        val stage4aPrompt = stationPrompts.value.find { it.stationId == "stage4a" } ?: StationPrompt("stage4a")
+        val stage4aConfig = remember(stage4aPrompt.configJson) {
+            GovernanceConfig.parseConfig(stage4aPrompt.configJson, Stage4aConfig.serializer()) ?: Stage4aConfig()
+        }
+        Stage4aConfigCard(
+            prompt = stage4aPrompt.prompt,
+            config = stage4aConfig,
+            onSave = { newPrompt, newConfig ->
+                val updated = StationPrompt(
+                    stationId = "stage4a",
+                    prompt = newPrompt,
+                    configJson = Json.encodeToString(Stage4aConfig.serializer(), newConfig)
+                )
+                GovernanceConfig.updateStationPrompt(updated)
+                stationPrompts.value = GovernanceConfig.loadStationPrompts()
+            }
         )
 
-        llmStationDefs.forEach { (stationId, name, icon) ->
-            val promptObj = stationPrompts.value.find { it.stationId == stationId } ?: StationPrompt(stationId)
-            StationPromptCard(
-                stationId = stationId,
-                name = name,
-                icon = icon,
-                prompt = promptObj.prompt,
-                onSave = { newPrompt ->
-                    GovernanceConfig.updateStationPrompt(StationPrompt(stationId, newPrompt, promptObj.configJson))
-                    stationPrompts.value = GovernanceConfig.loadStationPrompts()
-                }
-            )
+        // Stage 4B: Downstream Researcher
+        val stage4bPrompt = stationPrompts.value.find { it.stationId == "stage4b" } ?: StationPrompt("stage4b")
+        val stage4bConfig = remember(stage4bPrompt.configJson) {
+            GovernanceConfig.parseConfig(stage4bPrompt.configJson, Stage4bConfig.serializer()) ?: Stage4bConfig()
         }
+        Stage4bConfigCard(
+            prompt = stage4bPrompt.prompt,
+            config = stage4bConfig,
+            onSave = { newPrompt, newConfig ->
+                val updated = StationPrompt(
+                    stationId = "stage4b",
+                    prompt = newPrompt,
+                    configJson = Json.encodeToString(Stage4bConfig.serializer(), newConfig)
+                )
+                GovernanceConfig.updateStationPrompt(updated)
+                stationPrompts.value = GovernanceConfig.loadStationPrompts()
+            }
+        )
+
+        // Stage 4C: Synthesizer
+        val stage4cPrompt = stationPrompts.value.find { it.stationId == "stage4c" } ?: StationPrompt("stage4c")
+        val stage4cConfig = remember(stage4cPrompt.configJson) {
+            GovernanceConfig.parseConfig(stage4cPrompt.configJson, Stage4cConfig.serializer()) ?: Stage4cConfig()
+        }
+        Stage4cConfigCard(
+            prompt = stage4cPrompt.prompt,
+            config = stage4cConfig,
+            onSave = { newPrompt, newConfig ->
+                val updated = StationPrompt(
+                    stationId = "stage4c",
+                    prompt = newPrompt,
+                    configJson = Json.encodeToString(Stage4cConfig.serializer(), newConfig)
+                )
+                GovernanceConfig.updateStationPrompt(updated)
+                stationPrompts.value = GovernanceConfig.loadStationPrompts()
+            }
+        )
 
         Spacer(modifier = Modifier.height(32.dp))
     }
@@ -337,6 +412,7 @@ private fun Stage1ConfigCard(
     var severityThreshold by remember { mutableStateOf(config.severityThreshold) }
     var requiredDownstreamClass by remember { mutableIntStateOf(config.requiredDownstreamClass) }
     var dimensionBypass by remember { mutableStateOf(config.dimensionBypass.toSet()) }
+    var availableJsons by remember { mutableStateOf(config.availableJsons.toSet()) }
     var expanded by remember { mutableStateOf(true) }
 
     val severities = listOf("Informative", "Warning", "Error", "Critical")
@@ -455,13 +531,33 @@ private fun Stage1ConfigCard(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Data sources
+                    Text("Available JSON sources", fontSize = 12.sp, color = Color(0xFF6B7280))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    JsonSelectorChips(
+                        selected = availableJsons,
+                        options = getAvailableJsonsForStage("stage1"),
+                        onToggle = { file ->
+                            availableJsons = if (availableJsons.contains(file)) {
+                                availableJsons - file
+                            } else {
+                                availableJsons + file
+                            }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Button(
                         onClick = {
                             onSave(
                                 Stage1Config(
                                     severityThreshold = severityThreshold,
                                     requiredDownstreamClass = requiredDownstreamClass,
-                                    dimensionBypass = dimensionBypass.toList()
+                                    dimensionBypass = dimensionBypass.toList(),
+                                    availableJsons = availableJsons.toList()
                                 )
                             )
                         },
@@ -486,6 +582,7 @@ private fun Stage2ConfigCard(
     var catalogFields by remember { mutableStateOf(config.catalogFields.toSet()) }
     var fallbackChain by remember { mutableStateOf(config.fallbackChain.toMutableList()) }
     var maxCatalogColumns by remember { mutableIntStateOf(config.maxCatalogColumns) }
+    var availableJsons by remember { mutableStateOf(config.availableJsons.toSet()) }
     var expanded by remember { mutableStateOf(true) }
 
     val allEntityFields = listOf("entityName", "entityGroup", "ownerEmail", "description", "tags", "usageNotes")
@@ -621,6 +718,25 @@ private fun Stage2ConfigCard(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Data sources
+                    Text("Available JSON sources", fontSize = 12.sp, color = Color(0xFF6B7280))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    JsonSelectorChips(
+                        selected = availableJsons,
+                        options = getAvailableJsonsForStage("stage2"),
+                        onToggle = { file ->
+                            availableJsons = if (availableJsons.contains(file)) {
+                                availableJsons - file
+                            } else {
+                                availableJsons + file
+                            }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Button(
                         onClick = {
                             onSave(
@@ -628,7 +744,8 @@ private fun Stage2ConfigCard(
                                     entityFields = entityFields.toList(),
                                     catalogFields = catalogFields.toList(),
                                     fallbackChain = fallbackChain.toList(),
-                                    maxCatalogColumns = maxCatalogColumns
+                                    maxCatalogColumns = maxCatalogColumns,
+                                    availableJsons = availableJsons.toList()
                                 )
                             )
                         },
@@ -655,6 +772,7 @@ private fun Stage3ConfigCard(
     var groupHealthThreshold by remember { mutableFloatStateOf(config.groupHealthThreshold) }
     var groupFailingDatasetMin by remember { mutableIntStateOf(config.groupFailingDatasetMin) }
     var defaultIsolatedIncident by remember { mutableStateOf(config.defaultIsolatedIncident) }
+    var availableJsons by remember { mutableStateOf(config.availableJsons.toSet()) }
     var expanded by remember { mutableStateOf(true) }
 
     Card(
@@ -792,6 +910,25 @@ private fun Stage3ConfigCard(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Data sources
+                    Text("Available JSON sources", fontSize = 12.sp, color = Color(0xFF6B7280))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    JsonSelectorChips(
+                        selected = availableJsons,
+                        options = getAvailableJsonsForStage("stage3"),
+                        onToggle = { file ->
+                            availableJsons = if (availableJsons.contains(file)) {
+                                availableJsons - file
+                            } else {
+                                availableJsons + file
+                            }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Button(
                         onClick = {
                             onSave(
@@ -801,7 +938,8 @@ private fun Stage3ConfigCard(
                                     lookbackWindowDays = lookbackWindowDays,
                                     groupHealthThreshold = groupHealthThreshold,
                                     groupFailingDatasetMin = groupFailingDatasetMin,
-                                    defaultIsolatedIncident = defaultIsolatedIncident
+                                    defaultIsolatedIncident = defaultIsolatedIncident,
+                                    availableJsons = availableJsons.toList()
                                 )
                             )
                         },
@@ -815,17 +953,16 @@ private fun Stage3ConfigCard(
     }
 }
 
-// ==================== GENERIC LLM STATION PROMPT CARD ====================
+// ==================== STAGE 4A: UPSTREAM RESEARCHER ====================
 
 @Composable
-private fun StationPromptCard(
-    stationId: String,
-    name: String,
-    icon: ImageVector,
+private fun Stage4aConfigCard(
     prompt: String,
-    onSave: (String) -> Unit
+    config: Stage4aConfig,
+    onSave: (String, Stage4aConfig) -> Unit
 ) {
     var promptText by remember(prompt) { mutableStateOf(prompt) }
+    var availableJsons by remember { mutableStateOf(config.availableJsons.toSet()) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -835,14 +972,14 @@ private fun StationPromptCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = icon,
+                    imageVector = Icons.Default.Build,
                     contentDescription = null,
                     tint = Color(0xFF1A237E),
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = name,
+                    text = "Stage 4A Upstream Researcher",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF1A1A2E)
@@ -860,10 +997,170 @@ private fun StationPromptCard(
                 shape = RoundedCornerShape(8.dp)
             )
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text("Available JSON sources", fontSize = 12.sp, color = Color(0xFF6B7280))
+            Spacer(modifier = Modifier.height(6.dp))
+            JsonSelectorChips(
+                selected = availableJsons,
+                options = getAvailableJsonsForStage("stage4a"),
+                onToggle = { file ->
+                    availableJsons = if (availableJsons.contains(file)) {
+                        availableJsons - file
+                    } else {
+                        availableJsons + file
+                    }
+                }
+            )
+
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
-                onClick = { onSave(promptText) },
+                onClick = { onSave(promptText, Stage4aConfig(availableJsons = availableJsons.toList())) },
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text("Save")
+            }
+        }
+    }
+}
+
+// ==================== STAGE 4B: DOWNSTREAM RESEARCHER ====================
+
+@Composable
+private fun Stage4bConfigCard(
+    prompt: String,
+    config: Stage4bConfig,
+    onSave: (String, Stage4bConfig) -> Unit
+) {
+    var promptText by remember(prompt) { mutableStateOf(prompt) }
+    var availableJsons by remember { mutableStateOf(config.availableJsons.toSet()) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Assessment,
+                    contentDescription = null,
+                    tint = Color(0xFF1A237E),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Stage 4B Downstream Researcher",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF1A1A2E)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = promptText,
+                onValueChange = { promptText = it },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 4,
+                maxLines = 10,
+                shape = RoundedCornerShape(8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text("Available JSON sources", fontSize = 12.sp, color = Color(0xFF6B7280))
+            Spacer(modifier = Modifier.height(6.dp))
+            JsonSelectorChips(
+                selected = availableJsons,
+                options = getAvailableJsonsForStage("stage4b"),
+                onToggle = { file ->
+                    availableJsons = if (availableJsons.contains(file)) {
+                        availableJsons - file
+                    } else {
+                        availableJsons + file
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = { onSave(promptText, Stage4bConfig(availableJsons = availableJsons.toList())) },
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text("Save")
+            }
+        }
+    }
+}
+
+// ==================== STAGE 4C: SYNTHESIZER ====================
+
+@Composable
+private fun Stage4cConfigCard(
+    prompt: String,
+    config: Stage4cConfig,
+    onSave: (String, Stage4cConfig) -> Unit
+) {
+    var promptText by remember(prompt) { mutableStateOf(prompt) }
+    var availableJsons by remember { mutableStateOf(config.availableJsons.toSet()) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Article,
+                    contentDescription = null,
+                    tint = Color(0xFF1A237E),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Stage 4C Synthesizer",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF1A1A2E)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = promptText,
+                onValueChange = { promptText = it },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 4,
+                maxLines = 10,
+                shape = RoundedCornerShape(8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text("Available JSON sources", fontSize = 12.sp, color = Color(0xFF6B7280))
+            Spacer(modifier = Modifier.height(6.dp))
+            JsonSelectorChips(
+                selected = availableJsons,
+                options = getAvailableJsonsForStage("stage4c"),
+                onToggle = { file ->
+                    availableJsons = if (availableJsons.contains(file)) {
+                        availableJsons - file
+                    } else {
+                        availableJsons + file
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = { onSave(promptText, Stage4cConfig(availableJsons = availableJsons.toList())) },
                 modifier = Modifier.align(Alignment.End)
             ) {
                 Text("Save")

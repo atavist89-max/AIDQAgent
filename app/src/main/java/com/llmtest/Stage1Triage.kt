@@ -10,8 +10,8 @@ object Stage1Triage {
     fun run(alert: DQAlert): AnalysisState {
         val config = GovernanceConfig.getStage1Config()
         
-        // Load reports to check downstream impact
-        val reports = loadReports()
+        // Load reports to check downstream impact (if allowed)
+        val reports = if ("reports.json" in config.availableJsons) loadReports() else emptyList()
         val affectedReports = reports.filter { it.dataSources.contains(alert.datasetName) }
         val hasExecutiveReport = affectedReports.any { it.reportClass.toIntOrNull() ?: 0 >= config.requiredDownstreamClass }
         

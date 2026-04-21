@@ -26,19 +26,21 @@ object Stage4UpstreamResearcher {
         feedback: List<String> = emptyList()
     ): UpstreamAnalysisState = withContext(Dispatchers.IO) {
 
-        // Load enriched context
-        val entities = loadEntities()
+        val config = GovernanceConfig.getStage4aConfig()
+
+        // Load enriched context (conditionally)
+        val entities = if ("entities.json" in config.availableJsons) loadEntities() else emptyList()
         val entity = entities.find { it.linkedDatasetName == alert.datasetName }
         
-        val catalog = loadCatalog()
+        val catalog = if ("catalog_columns.json" in config.availableJsons) loadCatalog() else emptyList()
         val columns = catalog.filter { it.linkedDatasetName == alert.datasetName }
         val primaryColumn = columns.firstOrNull()
         
-        val knowledge = loadKnowledge()
-        val dimensionDef = knowledge.dimensions[alert.dimension]
+        val knowledge = if ("dq_knowledge.json" in config.availableJsons) loadKnowledge() else null
+        val dimensionDef = knowledge?.dimensions?.get(alert.dimension)
         
-        // Load group context for governance hierarchy
-        val allAlerts = loadAlerts()
+        // Load group context for governance hierarchy (conditionally)
+        val allAlerts = if ("dq_alerts.json" in config.availableJsons) loadAlerts() else emptyList()
         val currentGroup = entity?.entityGroup
         val groupDatasetsList = entities
             .filter { it.entityGroup == currentGroup }
@@ -69,25 +71,32 @@ object Stage4UpstreamResearcher {
             }
             appendLine()
             
-            appendLine("=== ENTITY CONTEXT ===")
-            appendLine("Entity Name: ${entity?.entityName ?: "Unknown"}")
-            appendLine("Entity Group: ${entity?.entityGroup ?: "Unknown"}")
-            appendLine("Description: ${entity?.description ?: "No description available"}")
-            appendLine()
+            if ("entities.json" in config.availableJsons) {
+                appendLine("=== ENTITY CONTEXT ===")
+                appendLine("Entity Name: ${entity?.entityName ?: "Unknown"}")
+                appendLine("Entity Group: ${entity?.entityGroup ?: "Unknown"}")
+                appendLine("Description: ${entity?.description ?: "No description available"}")
+                appendLine()
+            }
             
-            appendLine("=== DQ DIMENSION ANALYSIS ===")
-            appendLine("Dimension: ${alert.dimension}")
-            appendLine("Definition: ${dimensionDef?.definition ?: "N/A"}")
-            appendLine("Risk Type: ${dimensionDef?.riskType ?: "N/A"}")
-            appendLine("Check Failed: ${alert.checkName}")
-            appendLine()
+            if ("dq_knowledge.json" in config.availableJsons) {
+                appendLine("=== DQ DIMENSION ANALYSIS ===")
+                appendLine("Dimension: ${alert.dimension}")
+                appendLine("Definition: ${dimensionDef?.definition ?: "N/A"}")
+                appendLine("Risk Type: ${dimensionDef?.riskType ?: "N/A"}")
+                appendLine("Check Failed: ${alert.checkName}")
+                appendLine()
+            }
             
-            appendLine("=== GOVERNANCE HIERARCHY ===")
-            appendLine("Technical Layer: ${alert.datasourceName} (${alert.datasourceType}) → ${primaryColumn?.sourceDB}.${primaryColumn?.sourceTable}")
-            appendLine("Business Layer: ${entity?.entityName} → Group: ${entity?.entityGroup}")
-            appendLine("Organizational Layer: Group ${entity?.entityGroup} contains ${groupDatasets} datasets")
-            appendLine("Group Health: ${(healthScore * 100).toInt()}% (${groupPassing}/${groupTotal} passing)")
-            appendLine()
+            if ("entities.json" in config.availableJsons || "dq_alerts.json" in config.availableJsons) {
+                appendLine("=== GOVERNANCE HIERARCHY ===")
+                appendLine("Technical Layer: ${alert.datasourceName} (${alert.datasourceType}) → ${primaryColumn?.sourceDB}.${primaryColumn?.sourceTable}")
+                appendLine("Business Layer: ${entity?.entityName} → Group: ${entity?.entityGroup}")
+                appendLine("Organizational Layer: Group ${entity?.entityGroup} contains ${groupDatasets} datasets")
+                appendLine("Group Health: ${(healthScore * 100).toInt()}% (${groupPassing}/${groupTotal} passing)")
+                appendLine()
+            }
+            
             appendLine("=== INSTRUCTION ===")
             appendLine("You are investigating a Technical Data Architect.")
             appendLine("This dataset belongs to the ${entity?.entityGroup} business function.")
@@ -114,6 +123,17 @@ object Stage4UpstreamResearcher {
             appendLine("- Be specific and technical but explain business relevance")
             appendLine("- 200-250 words, professional technical briefing format")
             appendLine("- Do not hedge—state conclusions with confidence levels")
+
+            // Append raw previous stage outputs if selected
+            if ("stage1.json" in config.availableJsons) {
+                appendRawStageOutput("STAGE 1", 1)
+            }
+            if ("stage2.json" in config.availableJsons) {
+                appendRawStageOutput("STAGE 2", 2)
+            }
+            if ("stage3.json" in config.availableJsons) {
+                appendRawStageOutput("STAGE 3", 3)
+            }
 
             if (feedback.isNotEmpty()) {
                 appendLine()
@@ -189,5 +209,16 @@ object Stage4UpstreamResearcher {
         } catch (e: Exception) {
             DQKnowledge(emptyMap(), emptyMap(), KPIThresholds(0.85f, 0.60f, emptyMap(), emptyList()))
         }
+    }
+
+    private fun StringBuilder.appendRawStageOutput(label: String, stageNum: Int) {
+        try {
+            val file = GhostPaths.stateFile(stageNum)
+            if (file.exists()) {
+                appendLine()
+                appendLine("=== $label RAW OUTPUT ===")
+                appendLine(file.readText())
+            }
+        } catch (_: Exception) { }
     }
 }

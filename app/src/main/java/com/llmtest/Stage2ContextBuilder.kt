@@ -10,19 +10,19 @@ object Stage2ContextBuilder {
     fun run(alert: DQAlert, stage1State: AnalysisState): AnalysisState {
         val config = GovernanceConfig.getStage2Config()
         
-        // Load entity
-        val entities = loadEntities()
+        // Load entity (if allowed)
+        val entities = if ("entities.json" in config.availableJsons) loadEntities() else emptyList()
         val entity = entities.find { it.linkedDatasetName == alert.datasetName }
         
-        // Load catalog columns for this entity
-        val catalog = loadCatalog()
+        // Load catalog columns for this entity (if allowed)
+        val catalog = if ("catalog_columns.json" in config.availableJsons) loadCatalog() else emptyList()
         val entityColumns = catalog.filter { it.linkedDatasetName == alert.datasetName }
             .take(config.maxCatalogColumns)
         val keyColumn = entityColumns.find { it.name.contains(alert.checkName.split(" ").first(), ignoreCase = true) } 
             ?: entityColumns.firstOrNull()
         
-        // Load entity group
-        val groups = loadEntityGroups()
+        // Load entity group (if allowed)
+        val groups = if ("entity_groups.json" in config.availableJsons) loadEntityGroups() else emptyList()
         val group = groups.find { it.entityGroup == entity?.entityGroup }
         
         // Build condensed context (under 1200 tokens) using only configured fields

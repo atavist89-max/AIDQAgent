@@ -10,16 +10,16 @@ object Stage3PatternDetector {
     fun run(alert: DQAlert, stage2State: AnalysisState): AnalysisState {
         val config = GovernanceConfig.getStage3Config()
         
-        // Load all alerts to check owner workload
-        val allAlerts = loadAlerts()
+        // Load all alerts to check owner workload (if allowed)
+        val allAlerts = if ("dq_alerts.json" in config.availableJsons) loadAlerts() else emptyList()
         val ownerFailures = allAlerts.filter { 
             it.ownerEmail == alert.ownerEmail && 
             it.evaluationStatus == "fail" &&
             it.severity in listOf("Critical", "Error")
         }
         
-        // Load entities for group health calculation
-        val entities = loadEntities()
+        // Load entities for group health calculation (if allowed)
+        val entities = if ("entities.json" in config.availableJsons) loadEntities() else emptyList()
         
         // Find current alert's entity and its functional group
         val currentEntity = entities.find { it.linkedDatasetName == alert.datasetName }

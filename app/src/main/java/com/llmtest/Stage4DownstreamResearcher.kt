@@ -26,24 +26,26 @@ object Stage4DownstreamResearcher {
         feedback: List<String> = emptyList()
     ): DownstreamAnalysisState = withContext(Dispatchers.IO) {
 
-        // Load reports and severity info
-        val allReports = loadReports()
+        val config = GovernanceConfig.getStage4bConfig()
+
+        // Load reports and severity info (conditionally)
+        val allReports = if ("reports.json" in config.availableJsons) loadReports() else emptyList()
         val affectedReports = allReports.filter { it.dataSources.contains(alert.datasetName) }
         
-        val knowledge = loadKnowledge()
-        val severityRule = knowledge.severityRules[alert.severity]
+        val knowledge = if ("dq_knowledge.json" in config.availableJsons) loadKnowledge() else null
+        val severityRule = knowledge?.severityRules?.get(alert.severity)
         
         // Parse pattern info from stage 3
         val patternLines = stage3State.patternResult?.split("\n") ?: emptyList()
         val ownerLoad = patternLines.find { it.contains("OWNER_LOAD") }?.substringAfter(":")?.trim() ?: "Unknown"
         
-        // Load group context for entity group impact
-        val entities = loadEntities()
+        // Load group context for entity group impact (conditionally)
+        val entities = if ("entities.json" in config.availableJsons) loadEntities() else emptyList()
         val entity = entities.find { it.linkedDatasetName == alert.datasetName }
-        val entityGroups = loadEntityGroups()
+        val entityGroups = if ("entity_groups.json" in config.availableJsons) loadEntityGroups() else emptyList()
         val group = entityGroups.find { it.entityGroup == entity?.entityGroup }
         
-        val allAlerts = loadAlerts()
+        val allAlerts = if ("dq_alerts.json" in config.availableJsons) loadAlerts() else emptyList()
         val currentGroup = entity?.entityGroup
         val groupDatasetsList = entities
             .filter { it.entityGroup == currentGroup }
@@ -90,13 +92,16 @@ object Stage4DownstreamResearcher {
             appendLine("Owner Workload: ${alert.ownerEmail} has $ownerLoad other Critical failures open")
             appendLine()
             
-            appendLine("=== ENTITY GROUP IMPACT ===")
-            appendLine("Business Function: ${entity?.entityGroup}")
-            appendLine("Group Datasets: ${groupDatasets}")
-            appendLine("Group Health: ${(healthScore * 100).toInt()}%")
-            appendLine("Group Failing: ${groupTotal - groupPassing} of ${groupTotal} datasets")
-            appendLine("Group Owner: ${group?.ownerEmail}")
-            appendLine()
+            if ("entities.json" in config.availableJsons || "dq_alerts.json" in config.availableJsons) {
+                appendLine("=== ENTITY GROUP IMPACT ===")
+                appendLine("Business Function: ${entity?.entityGroup}")
+                appendLine("Group Datasets: ${groupDatasets}")
+                appendLine("Group Health: ${(healthScore * 100).toInt()}%")
+                appendLine("Group Failing: ${groupTotal - groupPassing} of ${groupTotal} datasets")
+                appendLine("Group Owner: ${group?.ownerEmail}")
+                appendLine()
+            }
+            
             appendLine("=== INSTRUCTION ===")
             appendLine("You are a Business Impact Analyst.")
             appendLine("${alert.datasetName} is one of ${groupDatasets} datasets in ${entity?.entityGroup}.")
@@ -127,6 +132,20 @@ object Stage4DownstreamResearcher {
             appendLine("- Be specific about who gets notified and why")
             appendLine("- 200-250 words, professional impact assessment format")
             appendLine("- Prioritize Class 2 above all—flag immediate escalation needs")
+
+            // Append raw previous stage outputs if selected
+            if ("stage1.json" in config.availableJsons) {
+                appendRawStageOutput("STAGE 1", 1)
+            }
+            if ("stage2.json" in config.availableJsons) {
+                appendRawStageOutput("STAGE 2", 2)
+            }
+            if ("stage3.json" in config.availableJsons) {
+                appendRawStageOutput("STAGE 3", 3)
+            }
+            if ("stage4a.json" in config.availableJsons) {
+                appendRawStageOutput("STAGE 4A", 41)
+            }
 
             if (feedback.isNotEmpty()) {
                 appendLine()
@@ -211,5 +230,16 @@ object Stage4DownstreamResearcher {
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    private fun StringBuilder.appendRawStageOutput(label: String, stageNum: Int) {
+        try {
+            val file = GhostPaths.stateFile(stageNum)
+            if (file.exists()) {
+                appendLine()
+                appendLine("=== $label RAW OUTPUT ===")
+                appendLine(file.readText())
+            }
+        } catch (_: Exception) { }
     }
 }

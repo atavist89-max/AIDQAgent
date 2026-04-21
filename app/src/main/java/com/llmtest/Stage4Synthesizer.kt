@@ -28,24 +28,26 @@ object Stage4Synthesizer {
         feedback: List<String> = emptyList()
     ): FinalSynthesisState = withContext(Dispatchers.IO) {
 
-        // Load severity info
-        val knowledge = loadKnowledge()
-        val severityRule = knowledge.severityRules[alert.severity]
-        val dimensionDef = knowledge.dimensions[alert.dimension]
+        val config = GovernanceConfig.getStage4cConfig()
 
-        // Load governance context
-        val entities = loadEntities()
+        // Load severity info (conditionally)
+        val knowledge = if ("dq_knowledge.json" in config.availableJsons) loadKnowledge() else null
+        val severityRule = knowledge?.severityRules?.get(alert.severity)
+        val dimensionDef = knowledge?.dimensions?.get(alert.dimension)
+
+        // Load governance context (conditionally)
+        val entities = if ("entities.json" in config.availableJsons) loadEntities() else emptyList()
         val entity = entities.find { it.linkedDatasetName == alert.datasetName }
-        val entityGroups = loadEntityGroups()
+        val entityGroups = if ("entity_groups.json" in config.availableJsons) loadEntityGroups() else emptyList()
         val group = entityGroups.find { it.entityGroup == entity?.entityGroup }
         
-        val catalog = loadCatalog()
+        val catalog = if ("catalog_columns.json" in config.availableJsons) loadCatalog() else emptyList()
         val primaryColumn = catalog.filter { it.linkedDatasetName == alert.datasetName }.firstOrNull()
         
-        val reports = loadReports()
+        val reports = if ("reports.json" in config.availableJsons) loadReports() else emptyList()
         val affectedReports = reports.filter { it.dataSources.contains(alert.datasetName) }
         
-        val allAlerts = loadAlerts()
+        val allAlerts = if ("dq_alerts.json" in config.availableJsons) loadAlerts() else emptyList()
         val currentGroup = entity?.entityGroup
         val groupDatasetsList = entities
             .filter { it.entityGroup == currentGroup }
@@ -75,13 +77,16 @@ object Stage4Synthesizer {
             appendLine("=== BUSINESS IMPACT ANALYSIS (from Downstream Researcher) ===")
             appendLine(stage4b.downstreamReport.take(800)) // Truncate if too long
             appendLine()
-            appendLine("=== GOVERNANCE HIERARCHY ===")
-            appendLine("Technical: ${alert.datasourceName} (${alert.datasourceType}) → ${primaryColumn?.sourceDB}.${primaryColumn?.sourceTable}")
-            appendLine("Business: ${entity?.entityName} → ${entity?.entityGroup}")
-            appendLine("Organizational: ${group?.ownerEmail} manages ${groupDatasets} datasets in ${entity?.entityGroup}")
-            appendLine("Downstream: ${affectedReports.size} reports affected")
-            appendLine("Group Health: ${(healthScore * 100).toInt()}%")
-            appendLine()
+            
+            if ("entities.json" in config.availableJsons || "catalog_columns.json" in config.availableJsons || "reports.json" in config.availableJsons || "dq_alerts.json" in config.availableJsons) {
+                appendLine("=== GOVERNANCE HIERARCHY ===")
+                appendLine("Technical: ${alert.datasourceName} (${alert.datasourceType}) → ${primaryColumn?.sourceDB}.${primaryColumn?.sourceTable}")
+                appendLine("Business: ${entity?.entityName} → ${entity?.entityGroup}")
+                appendLine("Organizational: ${group?.ownerEmail} manages ${groupDatasets} datasets in ${entity?.entityGroup}")
+                appendLine("Downstream: ${affectedReports.size} reports affected")
+                appendLine("Group Health: ${(healthScore * 100).toInt()}%")
+                appendLine()
+            }
             
             appendLine("=== INSTRUCTION ===")
             appendLine("You are a Senior Data Steward briefing the CDO.")
@@ -97,6 +102,23 @@ object Stage4Synthesizer {
             
             appendLine("TONE: Urgent but authoritative. Expert investigator briefing leadership. No hedging—state conclusions.")
             appendLine("Use actual names from the research reports. Make it feel like a senior steward who investigated for 2 hours.")
+
+            // Append raw previous stage outputs if selected
+            if ("stage1.json" in config.availableJsons) {
+                appendRawStageOutput("STAGE 1", 1)
+            }
+            if ("stage2.json" in config.availableJsons) {
+                appendRawStageOutput("STAGE 2", 2)
+            }
+            if ("stage3.json" in config.availableJsons) {
+                appendRawStageOutput("STAGE 3", 3)
+            }
+            if ("stage4a.json" in config.availableJsons) {
+                appendRawStageOutput("STAGE 4A", 41)
+            }
+            if ("stage4b.json" in config.availableJsons) {
+                appendRawStageOutput("STAGE 4B", 42)
+            }
 
             if (feedback.isNotEmpty()) {
                 appendLine()
@@ -214,5 +236,16 @@ object Stage4Synthesizer {
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    private fun StringBuilder.appendRawStageOutput(label: String, stageNum: Int) {
+        try {
+            val file = GhostPaths.stateFile(stageNum)
+            if (file.exists()) {
+                appendLine()
+                appendLine("=== $label RAW OUTPUT ===")
+                appendLine(file.readText())
+            }
+        } catch (_: Exception) { }
     }
 }

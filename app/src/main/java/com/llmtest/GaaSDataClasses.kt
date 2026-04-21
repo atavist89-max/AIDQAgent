@@ -36,7 +36,8 @@ data class StationPromptsFile(
 data class Stage1Config(
     val severityThreshold: String = "Warning",
     val requiredDownstreamClass: Int = 2,
-    val dimensionBypass: List<String> = emptyList()
+    val dimensionBypass: List<String> = emptyList(),
+    val availableJsons: List<String> = listOf("reports.json")
 )
 
 @Serializable
@@ -44,7 +45,8 @@ data class Stage2Config(
     val entityFields: List<String> = listOf("entityName", "entityGroup", "ownerEmail", "description"),
     val catalogFields: List<String> = listOf("sourceDB", "sourceTable", "definition", "dataExample"),
     val fallbackChain: List<String> = listOf("entityGroup", "ownerEmail", "datasetName"),
-    val maxCatalogColumns: Int = 5
+    val maxCatalogColumns: Int = 5,
+    val availableJsons: List<String> = listOf("entities.json", "catalog_columns.json", "entity_groups.json", "stage1.json")
 )
 
 @Serializable
@@ -54,7 +56,33 @@ data class Stage3Config(
     val lookbackWindowDays: Int = 7,
     val groupHealthThreshold: Float = 0.6f,
     val groupFailingDatasetMin: Int = 2,
-    val defaultIsolatedIncident: Boolean = true
+    val defaultIsolatedIncident: Boolean = true,
+    val availableJsons: List<String> = listOf("dq_alerts.json", "entities.json", "stage1.json", "stage2.json")
+)
+
+@Serializable
+data class Stage4aConfig(
+    val availableJsons: List<String> = listOf(
+        "entities.json", "catalog_columns.json", "dq_knowledge.json", "dq_alerts.json",
+        "stage1.json", "stage2.json", "stage3.json"
+    )
+)
+
+@Serializable
+data class Stage4bConfig(
+    val availableJsons: List<String> = listOf(
+        "reports.json", "dq_knowledge.json", "entities.json", "entity_groups.json", "dq_alerts.json",
+        "stage1.json", "stage2.json", "stage3.json", "stage4a.json"
+    )
+)
+
+@Serializable
+data class Stage4cConfig(
+    val availableJsons: List<String> = listOf(
+        "dq_knowledge.json", "entities.json", "entity_groups.json", "catalog_columns.json",
+        "reports.json", "dq_alerts.json",
+        "stage1.json", "stage2.json", "stage3.json", "stage4a.json", "stage4b.json"
+    )
 )
 
 // ==================== ATTEMPT RECORD FOR HUMAN INTERVENTION ====================

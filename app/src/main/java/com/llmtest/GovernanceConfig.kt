@@ -55,7 +55,8 @@ object GovernanceConfig {
                 appendLine("- Be specific and technical but explain business relevance")
                 appendLine("- 200-250 words, professional technical briefing format")
                 appendLine("- Do not hedge—state conclusions with confidence levels")
-            }.trim()
+            }.trim(),
+            configJson = json.encodeToString(Stage4aConfig.serializer(), Stage4aConfig())
         ),
         StationPrompt(
             stationId = "stage4b",
@@ -83,7 +84,8 @@ object GovernanceConfig {
                 appendLine("- Be specific about who gets notified and why")
                 appendLine("- 200-250 words, professional impact assessment format")
                 appendLine("- Prioritize Class 2 above all—flag immediate escalation needs")
-            }.trim()
+            }.trim(),
+            configJson = json.encodeToString(Stage4bConfig.serializer(), Stage4bConfig())
         ),
         StationPrompt(
             stationId = "stage4c",
@@ -102,7 +104,8 @@ object GovernanceConfig {
                 appendLine()
                 appendLine("TONE: Urgent but authoritative. Expert investigator briefing leadership. No hedging—state conclusions.")
                 appendLine("Use actual names from the research reports. Make it feel like a senior steward who investigated for 2 hours.")
-            }.trim()
+            }.trim(),
+            configJson = json.encodeToString(Stage4cConfig.serializer(), Stage4cConfig())
         )
     )
 
@@ -239,6 +242,18 @@ object GovernanceConfig {
 
     fun getStage3Config(): Stage3Config {
         return getStationPrompt("stage3")?.configJson?.let { parseConfig(it, Stage3Config.serializer()) } ?: Stage3Config()
+    }
+
+    fun getStage4aConfig(): Stage4aConfig {
+        return getStationPrompt("stage4a")?.configJson?.let { parseConfig(it, Stage4aConfig.serializer()) } ?: Stage4aConfig()
+    }
+
+    fun getStage4bConfig(): Stage4bConfig {
+        return getStationPrompt("stage4b")?.configJson?.let { parseConfig(it, Stage4bConfig.serializer()) } ?: Stage4bConfig()
+    }
+
+    fun getStage4cConfig(): Stage4cConfig {
+        return getStationPrompt("stage4c")?.configJson?.let { parseConfig(it, Stage4cConfig.serializer()) } ?: Stage4cConfig()
     }
 
     // ---------- Block State ----------
