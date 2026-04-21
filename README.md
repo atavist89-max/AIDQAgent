@@ -173,8 +173,9 @@ Token limit (~2,000) requires chunking. Each stage fits within budget while accu
 │   ├── Stage3PatternDetector.kt    # Owner workload correlation, group health → pattern detection
 │   ├── Stage4UpstreamResearcher.kt # Technical Data Architect: root cause hypothesis + investigation path
 │   ├── Stage4DownstreamResearcher.kt# Business Impact Analyst: cascade + stakeholder notification priority
-│   ├── Stage4Synthesizer.kt        # Senior Data Steward: executive narrative for CDO briefing
+│   ├── Stage4Synthesizer.kt        # Senior Data Steward: executive narrative for CDO briefing (on-demand tap-to-view)
 │   ├── Stage4Synthesis.kt          # Legacy monolithic synthesis (retained for reference)
+│   ├── EntityData.kt               # Centralized entity metadata loader and cache
 │   ├── BugLogger.kt                # File-based timestamped logger (logs/bug_log.txt)
 │   ├── GovernanceScreen.kt         # Single-scroll Governance tab: system prompt, 5 policy cards, 6 station editors
 │   ├── HumanInterventionScreen.kt  # Full-screen arbitration UI after 3 failed auto-retries
@@ -210,12 +211,12 @@ Token limit (~2,000) requires chunking. Each stage fits within budget while accu
 | `Stage3PatternDetector.kt` | Loads `dq_alerts.json` to count owner failures and compute entity group health score by functional group. Detects `owner_overload`, `group_collapse`, or `isolated_incident`. Writes `stage3.json`. |
 | `Stage4UpstreamResearcher.kt` | Technical Data Architect sub-agent. Reads editable prompt from `station_prompts.json`. Analyzes source system architecture, builds root cause hypothesis. Writes `stage4a.json`. |
 | `Stage4DownstreamResearcher.kt` | Business Impact Analyst sub-agent. Reads editable prompt from `station_prompts.json`. Assesses cascade chains, stakeholder priority. Writes `stage4b.json`. |
-| `Stage4Synthesizer.kt` | Senior Data Steward sub-agent. Reads editable prompt from `station_prompts.json`. Synthesizes upstream + downstream research into executive narrative. Writes `stage4c.json`. |
+| `Stage4Synthesizer.kt` | Senior Data Steward sub-agent. Reads editable prompt from `station_prompts.json`. Synthesizes upstream + downstream research into executive narrative. Writes `stage4c.json`. Report is viewed on-demand by tapping the station. |
 | `BugLogger.kt` | Thread-safe file logger. Logs every stage transition, file I/O error, and LLM exception to app-private storage. Accessible via "Logs" button in UI. |
 | `GovernanceScreen.kt` | Single-scroll Governance configuration tab. Section A: fixed system prompt card. Section B: 5 policy cards with toggle + prompt field. Section C: 6 station-agent editor cards. |
 | `HumanInterventionScreen.kt` | Arbitration UI shown after 3 failed GaaS retries. Displays station output, GaaS feedback, attempt history, and two buttons: Accept Station Version or Accept GaaS Assessment. |
 | `MetroMap.kt` | Interactive canvas-based pipeline visualization. 6 stations, 5 gates, animated train, pan/zoom, formatted tooltips. Shows human intervention screen overlay when required. |
-| `MetroStation.kt` | Circular station composable with icon, label, and agent name. Pulsing animation when active. |
+| `MetroStation.kt` | Circular station composable with icon, label, and editable agent name. Pulsing animation when active. Tapping a completed station opens its on-demand report view. |
 | `MetroGate.kt` | Diamond-shaped gate composable supporting 6 visual states (inactive, active, reviewing, rejected, approved, overridden). |
 | `MetroTrain.kt` | Alert card that moves along the pipeline. Shows dataset, severity, dimension, elapsed time, progress, and "Waiting at Gate" message when blocked. |
 | `AgentThoughtPanel.kt` | Expandable bottom panel showing the active agent's reasoning with proper markdown formatting (bold, italic, bullets). |
@@ -250,14 +251,15 @@ The system consumes 5 integrated data sources:
 4. **Build the Alert:** Select `postgres` → `beta_hub` → `LINK_ORDER_CUSTOMER` → choose from 5–7 check names. Watch auto-fill populate severity, dimension, and owner email.
 5. **Send:** Tap "Send DQ Alert" → Toast confirms delivery
 6. **Switch to Analyze:** Tap "Analyze" tab. Watch the **Metro Map visualization** — a train moves through 6 stations (Stage 1→4c) with 5 governance gates between them. Tap any station or gate for a tooltip explaining what that step does. The train pauses and pulses when a gate rejects output.
-7. **The Reveal:** Executive Stewardship Report appears with technical briefing, impact assessment, and actionable recommendations
+7. **The Reveal:** Tap any completed station (Stage 4a, 4b, or 4c) to view its report on-demand. The full Executive Stewardship Report, technical briefing, and impact assessment are no longer auto-presented — they open when you choose.
 
 ### Governance Configuration Demo
 
 1. **Open Governance:** Tap the **Governance** tab. See the fixed system prompt card at the top (collapsible).
 2. **Enable a Gate:** Toggle "Enable Gate" on Gate 1. Enter a custom policy prompt like "Ensure severity is Critical before allowing FULL_ANALYSIS."
-3. **Edit Station Prompts:** Scroll to Stage 4A Upstream Researcher and modify its system prompt. Tap Save.
-4. **Trigger Analysis:** Switch to Create, build an alert, and send it. Switch to Analyze and watch the enabled gate actively review the stage output.
+3. **Edit Agent Names & Prompts:** Scroll to any stage card. Rename the agent (e.g., change "Upstream Researcher" to "Root Cause Analyst") and modify its system prompt. Tap Save. The new name appears in the Metro Map and Agent Thought Panel.
+4. **Configure JSON Sources:** In each stage card, toggle which JSON files the stage should read at runtime — on-device reference files and previous stage outputs are available as filter chips.
+5. **Trigger Analysis:** Switch to Create, build an alert, and send it. Switch to Analyze and watch the enabled gate actively review the stage output.
 
 ### Human Intervention Demo
 
@@ -309,8 +311,8 @@ App requires `MANAGE_EXTERNAL_STORAGE` (Android 11+) to read:
 ## UI & Interaction Notes
 
 - **Locked portrait orientation** — prevents accidental screen rotation from resetting pipeline state/presets during analysis.
-- **Expandable stage outputs** — Stage 4a, 4b, and 4c cards show truncated previews by default to save vertical space. Tap **Expand** to view the full report inline; tap **Collapse** to return to the preview.
-- **Persistent stage visibility** — after the pipeline completes, all stage outputs remain visible in the scrollable feed.
+- **On-demand stage reports** — Stage 4a, 4b, and 4c reports are not auto-presented. Tap a completed station in the Metro Map to open its full report. This keeps the Analyze tab clean until you want the detail.
+- **Persistent stage visibility** — after the pipeline completes, all station outputs remain visible and tappable in the Metro Map.
 - **Markdown text rendering** — all generated text (agent thoughts, GaaS feedback, tooltips, intervention screen) renders actual bold, italic, and bullet formatting instead of raw markdown syntax.
 
 ## Project Status
@@ -327,6 +329,9 @@ App requires `MANAGE_EXTERNAL_STORAGE` (Android 11+) to read:
 - ✅ Metro Map Visualization (6 stations, 5 gates, 6 visual states, animated train)
 - ✅ Markdown Text Rendering (bold, italic, bullets throughout UI)
 - ✅ Fixed GaaS System Prompt (visible in Governance tab)
+- ✅ Editable Agent Names (all 6 stages, flows to Metro Map and Agent Thought Panel)
+- ✅ Per-Stage JSON Source Selection (on-device + previous stage outputs via filter chips)
+- ✅ On-Demand Report Views (tap Stage 4a/4b/4c stations to open full reports)
 
 **Next:** Integration with live DQ feed (replace file drop with real-time API)
 
