@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun GovernanceScreen() {
     val scrollState = rememberScrollState()
@@ -90,7 +91,7 @@ fun GovernanceScreen() {
         // Stage 1: Triage Decision Matrix
         val stage1Prompt = stationPrompts.value.find { it.stationId == "stage1" } ?: StationPrompt("stage1")
         val stage1Config = remember(stage1Prompt.configJson) {
-            GovernanceConfig.parseConfig<Stage1Config>(stage1Prompt.configJson) ?: Stage1Config()
+            GovernanceConfig.parseConfig(stage1Prompt.configJson, Stage1Config.serializer()) ?: Stage1Config()
         }
         Stage1ConfigCard(
             config = stage1Config,
@@ -105,7 +106,7 @@ fun GovernanceScreen() {
         // Stage 2: Entity Enrichment Selector
         val stage2Prompt = stationPrompts.value.find { it.stationId == "stage2" } ?: StationPrompt("stage2")
         val stage2Config = remember(stage2Prompt.configJson) {
-            GovernanceConfig.parseConfig<Stage2Config>(stage2Prompt.configJson) ?: Stage2Config()
+            GovernanceConfig.parseConfig(stage2Prompt.configJson, Stage2Config.serializer()) ?: Stage2Config()
         }
         Stage2ConfigCard(
             config = stage2Config,
@@ -119,7 +120,7 @@ fun GovernanceScreen() {
         // Stage 3: Pattern Detection Thresholds
         val stage3Prompt = stationPrompts.value.find { it.stationId == "stage3" } ?: StationPrompt("stage3")
         val stage3Config = remember(stage3Prompt.configJson) {
-            GovernanceConfig.parseConfig<Stage3Config>(stage3Prompt.configJson) ?: Stage3Config()
+            GovernanceConfig.parseConfig(stage3Prompt.configJson, Stage3Config.serializer()) ?: Stage3Config()
         }
         Stage3ConfigCard(
             config = stage3Config,

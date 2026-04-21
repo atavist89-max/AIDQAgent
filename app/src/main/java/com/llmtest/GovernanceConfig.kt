@@ -218,10 +218,10 @@ object GovernanceConfig {
 
     // ---------- Config Helpers ----------
 
-    inline fun <reified T> parseConfig(configJson: String): T? {
+    fun <T> parseConfig(configJson: String, serializer: kotlinx.serialization.KSerializer<T>): T? {
         return try {
             if (configJson.isNotBlank()) {
-                json.decodeFromString(serializer<T>(), configJson)
+                json.decodeFromString(serializer, configJson)
             } else null
         } catch (e: Exception) {
             BugLogger.logError("GovernanceConfig: Failed to parse config", e)
@@ -230,15 +230,15 @@ object GovernanceConfig {
     }
 
     fun getStage1Config(): Stage1Config {
-        return getStationPrompt("stage1")?.configJson?.let { parseConfig<Stage1Config>(it) } ?: Stage1Config()
+        return getStationPrompt("stage1")?.configJson?.let { parseConfig(it, Stage1Config.serializer()) } ?: Stage1Config()
     }
 
     fun getStage2Config(): Stage2Config {
-        return getStationPrompt("stage2")?.configJson?.let { parseConfig<Stage2Config>(it) } ?: Stage2Config()
+        return getStationPrompt("stage2")?.configJson?.let { parseConfig(it, Stage2Config.serializer()) } ?: Stage2Config()
     }
 
     fun getStage3Config(): Stage3Config {
-        return getStationPrompt("stage3")?.configJson?.let { parseConfig<Stage3Config>(it) } ?: Stage3Config()
+        return getStationPrompt("stage3")?.configJson?.let { parseConfig(it, Stage3Config.serializer()) } ?: Stage3Config()
     }
 
     // ---------- Block State ----------
